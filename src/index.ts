@@ -1,4 +1,6 @@
 export { PrismaErrorCodes } from './codes.js';
+export { parsePrismaPostgresError } from './postgres.js';
+export type { ParsedPrismaPostgresError } from './postgres.js';
 export { isPrismaError, isPrismaKnownRequestError, getPrismaErrorKind } from './guards.js';
 export { getPrismaErrorContext } from './metadata.js';
 export { createPrismaErrorHandler } from './handler.js';

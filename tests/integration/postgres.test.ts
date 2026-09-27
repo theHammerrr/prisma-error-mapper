@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PrismaClient } from '@prisma/client';
 import {
   PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, getPrismaErrorKind,
-  isPrismaError, isPrismaKnownRequestError,
+  isPrismaError, isPrismaKnownRequestError, parsePrismaPostgresError,
 } from '../../src/index.js';
 
 const prisma = new PrismaClient();
@@ -47,9 +47,20 @@ test('check normal email rejects an insert and preserves Prisma unknown-request 
   assert.equal(getPrismaErrorKind(error), 'unknown-request');
   assert.equal('code' in error, false);
   assert.equal('meta' in error, false);
-  // Verify the observed diagnostic, without introducing message parsing into the package.
+  // Default handling stays unchanged; parsing is an explicit separate call.
   assert.match(error.message, /check normal email/);
   assert.match(error.message, /23514/);
+  assert.deepEqual(parsePrismaPostgresError(error), {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514',
+    tableName: 'Account', constraintName: 'check normal email', source: 'message', original: error,
+  });
+  const applicationError = new Error('האימייל אינו יכול להתחיל ב־123');
+  const handler = createPrismaErrorHandler({}, { fallback: original => {
+    const parsed = parsePrismaPostgresError(original);
+    if (parsed?.tableName === 'Account' && parsed.constraintName === 'check normal email') return applicationError;
+    throw original;
+  } });
+  assert.equal(handler(error), applicationError);
   assert.equal(getPrismaErrorContext(error), undefined);
   assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
   assert.equal(createPrismaErrorHandler({}, { fallback: value => value })(error), error);
@@ -70,6 +81,7 @@ test('check normal email rejects updates and leaves the previous email unchanged
   assert.ok(isPrismaError(error));
   assert.equal(getPrismaErrorKind(error), 'unknown-request');
   assert.match(error.message, /check normal email/);
+  assert.equal(parsePrismaPostgresError(error)?.constraintName, 'check normal email');
   const unchanged = await prisma.account.findUniqueOrThrow({ where: { id: account.id } });
   assert.equal(unchanged.email, account.email);
 });
@@ -84,6 +96,10 @@ test('check normal email through raw SQL exposes P2010 with SQLSTATE 23514', asy
   assert.equal(error.meta?.code, '23514');
   assert.equal(typeof error.meta?.message, 'string');
   assert.match(String(error.meta?.message), /check normal email/);
+  assert.deepEqual(parsePrismaPostgresError(error), {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514',
+    tableName: 'Account', constraintName: 'check normal email', source: 'raw-query-meta', original: error,
+  });
   assert.equal(getPrismaErrorContext(error), undefined);
   assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
   assert.equal(await prisma.account.count(), 0);

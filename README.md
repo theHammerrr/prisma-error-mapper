@@ -176,6 +176,46 @@ switch (getPrismaErrorKind(error)) {
 }
 ```
 
+## Structured PostgreSQL CHECK diagnostics (opt-in)
+
+`parsePrismaPostgresError(error)` derives a separate structure from the Prisma 6.14 PostgreSQL CHECK failure format verified by the integration tests. It supports ORM unknown-request diagnostics and raw-query P2010 metadata with SQLSTATE 23514. It does not parse arbitrary Prisma messages or other constraint types.
+
+```ts
+import { parsePrismaPostgresError, createPrismaErrorHandler } from 'prisma-error-mapper';
+
+const diagnostic = parsePrismaPostgresError(error);
+// For the tested ORM CHECK failure:
+// {
+//   provider: 'postgresql',
+//   kind: 'check-constraint',
+//   sqlState: '23514',
+//   tableName: 'Account',
+//   constraintName: 'check normal email',
+//   source: 'message',
+//   original: error,
+// }
+
+const handle = createPrismaErrorHandler({}, {
+  fallback: (error) => {
+    const diagnostic = parsePrismaPostgresError(error);
+    if (
+      diagnostic?.tableName === 'Account' &&
+      diagnostic.constraintName === 'check normal email'
+    ) {
+      return new AppError(422, 'האימייל אינו יכול להתחיל ב־123', 'INVALID_EMAIL_PREFIX');
+    }
+    throw error;
+  },
+});
+
+// Inside your catch block:
+throw handle(error);
+```
+
+`sqlState` is a PostgreSQL code, not a Prisma `P...` code. `source` is `message` for unknown-request errors or `raw-query-meta` for P2010. The exported `ParsedPrismaPostgresError` type narrows the `original` error type by `source`. The derived structure is never inserted into `original.meta`, and existing guards and handler mappings remain unchanged.
+
+Parsing is best-effort and format-dependent. The parser requires a real Prisma error instance, the matching SQLSTATE, and the recognized primary PostgreSQL CHECK message. It ignores row details when identifying the constraint. Unsupported or malformed inputs return `undefined` without throwing. Localized/changed formats, identifiers containing double quotes, Rust debug escapes outside the supported JSON-compatible subset, and messages longer than 65,536 characters are deliberately unsupported. This is not a stable PostgreSQL protocol decoder: retain the original error as a fallback and rerun integration tests when upgrading Prisma.
+
 ## Supported codes and metadata
 
 | Code | Meaning | Validated raw fields | Normalized view |
@@ -206,9 +246,9 @@ Add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts` and a se
 
 ## Public exports
 
-Runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`.
+Runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`, `parsePrismaPostgresError`.
 
-Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`.
+Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`, `ParsedPrismaPostgresError`.
 
 ## Development and packaging
 
@@ -232,7 +272,7 @@ ALTER TABLE "Account"
 
 This rejects inserts and updates when the email starts with `123`; values containing `123` elsewhere remain allowed. The quoted name preserves its spaces. It is a prefix rule, not general email validation. The fixture's email column is already non-nullable.
 
-With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request` and preserves them through its default rethrow or configured fallback; it does not parse the message into a fabricated constraint property. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a structured constraint-name field. Integration tests cover both paths and verify that rejected updates leave the original email intact.
+With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request` and preserves them through its default rethrow or configured fallback. Applications can explicitly call `parsePrismaPostgresError` to derive a separate diagnostic structure. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a Prisma-provided constraint-name field. Integration tests cover parsing both paths and verify that rejected updates leave the original email intact.
 
 Start Docker Desktop (Linux containers) or a local Docker Engine, then run:
 

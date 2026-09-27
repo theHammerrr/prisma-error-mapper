@@ -1,9 +1,29 @@
-import { PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, isPrismaError } from '../src/index.js';
+import { PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, isPrismaError, parsePrismaPostgresError } from '../src/index.js';
 import type { PrismaErrorCode, PrismaErrorMeta, PrismaErrorHandlerMap } from '../src/index.js';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 function expect<T extends true>(..._proof: T extends true ? [] : never): void {}
 class AppError extends Error { status = 409; }
 export function typeAssertions(error: unknown): void {
+  const diagnostic = parsePrismaPostgresError(error);
+  if (diagnostic) {
+    expect<Equal<typeof diagnostic.sqlState, '23514'>>();
+    expect<Equal<typeof diagnostic.kind, 'check-constraint'>>();
+    expect<Equal<typeof diagnostic.constraintName, string>>();
+    // @ts-expect-error Parsed diagnostics are not Prisma metadata.
+    diagnostic.meta;
+    if (diagnostic.source === 'message') {
+      // @ts-expect-error The unknown-request original has no Prisma code.
+      diagnostic.original.code;
+    } else {
+      expect<Equal<typeof diagnostic.original.code, string>>();
+    }
+  }
+  const parsedHandler = createPrismaErrorHandler({}, { fallback: original => {
+    if (parsePrismaPostgresError(original)) return new AppError();
+    throw original;
+  } });
+  const parsedResult = parsedHandler(error);
+  expect<Equal<typeof parsedResult, AppError>>();
   expect<Equal<`${PrismaErrorCodes}`, PrismaErrorCode>>();
   if (isPrismaError(error, PrismaErrorCodes.RecordNotFound)) {
     expect<Equal<typeof error.code, PrismaErrorCodes.RecordNotFound>>();
