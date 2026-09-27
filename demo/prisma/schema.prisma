@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+  name  String
+  posts Post[]
+}
+
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String
+  accountId Int
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+}
+
+model Payment {
+  id        Int @id @default(autoincrement())
+  amount    Int
+  accountId Int
+}

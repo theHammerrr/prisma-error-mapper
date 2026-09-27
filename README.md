@@ -381,3 +381,10 @@ Coverage includes:
 **Observed PostgreSQL behavior:** named and default-named constraints both produce column arrays in P2002 metadata, not constraint-name strings. Other providers can differ. P2015 remains covered by constructor-based unit tests; the real nested missing-record scenario here emits P2025, so the suite does not manufacture a P2015 response. Unknown-request errors and Rust panics are likewise unit-tested rather than induced by destabilizing the engine.
 
 CI runs unit/build checks and a separate container integration job on Node 22 and 24. `npm run check` and `npm pack` stay Docker-independent.
+
+## Express demo
+
+The runnable [Express and Prisma demo](demo/README.md) consumes this repository via
+`file:..`. It demonstrates supported code mappings, PostgreSQL CHECK routing,
+per-operation overrides, guards, unhandled Prisma errors, and non-Prisma fallback
+behavior without publishing the package.
