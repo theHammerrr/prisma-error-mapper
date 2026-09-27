@@ -1,9 +1,39 @@
 import { PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, isPrismaError, parsePrismaPostgresError } from '../src/index.js';
-import type { PrismaErrorCode, PrismaErrorMeta, PrismaErrorHandlerMap } from '../src/index.js';
+import type { PrismaError, PrismaErrorCode, PrismaErrorMeta, PrismaErrorHandlerMap, ParsedPrismaPostgresError, PrismaConstraintHandlerMap } from '../src/index.js';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 function expect<T extends true>(..._proof: T extends true ? [] : never): void {}
 class AppError extends Error { status = 409; }
 export function typeAssertions(error: unknown): void {
+  const direct = createPrismaErrorHandler({}, {
+    constraints: { Account: { 'check normal email': context => {
+      expect<Equal<typeof context, ParsedPrismaPostgresError>>();
+      expect<Equal<typeof context.sqlState, '23514'>>();
+      // @ts-expect-error Derived diagnostics are separate from Prisma metadata.
+      context.meta;
+      return new AppError();
+    } } },
+  });
+  const directResult = direct(error);
+  expect<Equal<typeof directResult, AppError>>();
+  const directOverride = direct(error, { P2002: () => 409 });
+  expect<Equal<typeof directOverride, AppError | number>>();
+  const routes = createPrismaErrorHandler({ P2025: () => new AppError() }, {
+    constraints: {
+      Account: { email: () => 422 }, Other: { other: () => true as const },
+    },
+    onUnhandledPrismaError: original => {
+      expect<Equal<typeof original, PrismaError>>();
+      return 'unmatched' as const;
+    },
+    fallback: original => {
+      expect<Equal<typeof original, unknown>>();
+      return null;
+    },
+  });
+  const routedResult = routes(error);
+  expect<Equal<typeof routedResult, AppError | number | true | 'unmatched' | null>>();
+  const reusable = { Account: { email: context => context.constraintName } } satisfies PrismaConstraintHandlerMap;
+  expect<Equal<ReturnType<typeof reusable.Account.email>, string>>();
   const diagnostic = parsePrismaPostgresError(error);
   if (diagnostic) {
     expect<Equal<typeof diagnostic.sqlState, '23514'>>();
@@ -18,7 +48,7 @@ export function typeAssertions(error: unknown): void {
       expect<Equal<typeof diagnostic.original.code, string>>();
     }
   }
-  const parsedHandler = createPrismaErrorHandler({}, { fallback: original => {
+  const parsedHandler = createPrismaErrorHandler({}, { onUnhandledPrismaError: original => {
     if (parsePrismaPostgresError(original)) return new AppError();
     throw original;
   } });

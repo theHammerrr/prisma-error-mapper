@@ -144,9 +144,35 @@ test('unmapped, malformed and unrelated values are rethrown unchanged', () => {
     assert.equal(caught, true);
   }
 });
-test('fallback preserves values and handles all unmapped categories', () => {
-  const handler = createPrismaErrorHandler({}, { fallback: error => error });
+test('separate hooks can preserve both Prisma and non-Prisma values', () => {
+  const handler = createPrismaErrorHandler({}, { onUnhandledPrismaError: error => error, fallback: error => error });
   for (const error of [null, undefined, known('P2002'), new Error('x')]) assert.equal(handler(error), error);
+});
+
+test('unmatched Prisma errors never reach the non-Prisma fallback', () => {
+  const errors = [known('P9999'), known('P2002', { target: 3 }),
+    new Validation('invalid', { clientVersion: version }), new Init('init', version),
+    new Unknown('unknown', { clientVersion: version }), new Panic('panic', version)];
+  const handler = createPrismaErrorHandler({}, {
+    onUnhandledPrismaError: error => ({ prisma: error }),
+    fallback: error => ({ other: error }),
+  });
+  for (const error of errors) assert.deepEqual(handler(error), { prisma: error });
+  const noPrismaHook = createPrismaErrorHandler({}, { fallback: () => assert.fail('Wrong route') });
+  for (const error of errors) assert.throws(() => noPrismaHook(error), value => value === error);
+  for (const error of [null, undefined, 'unexpected', new Error('other')]) {
+    assert.deepEqual(handler(error), { other: error });
+  }
+});
+
+test('code mappings and overrides precede the unmatched Prisma hook', () => {
+  const handler = createPrismaErrorHandler({ P2002: () => 'base' }, {
+    onUnhandledPrismaError: () => 'unmatched', fallback: () => 'unrelated',
+  });
+  assert.equal(handler(known('P2002')), 'base');
+  assert.equal(handler(known('P2002'), { P2002: () => 'override' }), 'override');
+  assert.equal(handler(known('P2025')), 'unmatched');
+  assert.equal(handler(new Error()), 'unrelated');
 });
 test('P1012 mapping handles initialization and request errors with distinct kinds', () => {
   const handler = createPrismaErrorHandler({ P1012: ({ code, kind, meta }) => ({ code, kind, meta }) });

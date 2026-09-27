@@ -14,6 +14,25 @@ ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Postgr
 });
 
 const primary = 'new row for relation "Account" violates check constraint "check normal email"';
+test('named CHECK mappings directly handle ORM and raw-query errors without fallback', () => {
+  const appError = new Error('האימייל אינו יכול להתחיל ב־123');
+  const handle = createPrismaErrorHandler({}, {
+    constraints: {
+      Account: {
+        'check normal email': ({ tableName, constraintName, sqlState }) => {
+          assert.equal(tableName, 'Account');
+          assert.equal(constraintName, 'check normal email');
+          assert.equal(sqlState, '23514');
+          return appError;
+        },
+      },
+    },
+    fallback: () => assert.fail('A Prisma CHECK error must not enter the non-Prisma fallback'),
+    onUnhandledPrismaError: () => assert.fail('This named constraint has a handler'),
+  });
+  assert.equal(handle(connector()), appError);
+  assert.equal(handle(raw({ code: '23514', message: primary })), appError);
+});
 function connector(message = primary, code = '23514', detail = 'row data'): Unknown {
   return new Unknown(`Error occurred during query execution:\nConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "${code}", message: ${JSON.stringify(message)}, severity: "ERROR", detail: Some(${JSON.stringify(detail)}), column: None, hint: None }), transient: false })`, { clientVersion: '6.14.0' });
 }
@@ -84,9 +103,9 @@ test('parser handles CRLF framing and frozen errors without mutation', () => {
   assert.equal(parsed?.original, error);
 });
 
-test('an opt-in fallback maps one constraint and preserves other errors', () => {
+test('an unmatched Prisma hook can still use custom parser logic', () => {
   const applicationError = new Error('האימייל אינו יכול להתחיל ב־123');
-  const handler = createPrismaErrorHandler({}, { fallback: error => {
+  const handler = createPrismaErrorHandler({}, { onUnhandledPrismaError: error => {
     const parsed = parsePrismaPostgresError(error);
     if (parsed?.tableName === 'Account' && parsed.constraintName === 'check normal email') return applicationError;
     throw error;
@@ -96,4 +115,47 @@ test('an opt-in fallback maps one constraint and preserves other errors', () => 
   assert.throws(() => handler(other), error => error === other);
   const unrelated = new Error('unrelated');
   assert.throws(() => handler(unrelated), error => error === unrelated);
+});
+
+test('constraint names are scoped to the table and unknown names follow the Prisma hook', () => {
+  const handle = createPrismaErrorHandler({}, {
+    constraints: {
+      Account: { 'check normal email': () => 'account' },
+      Other: { 'check normal email': () => 'other' },
+    },
+    onUnhandledPrismaError: () => 'unmatched',
+    fallback: () => assert.fail('Not a non-Prisma error'),
+  });
+  assert.equal(handle(connector()), 'account');
+  assert.equal(handle(connector('new row for relation "Other" violates check constraint "check normal email"')), 'other');
+  assert.equal(handle(connector('new row for relation "Missing" violates check constraint "check normal email"')), 'unmatched');
+  assert.equal(handle(connector('new row for relation "Account" violates check constraint "other check"')), 'unmatched');
+  assert.equal(handle(connector('unsupported diagnostic')), 'unmatched');
+});
+
+test('constraint callbacks may return undefined or throw without invoking another hook', () => {
+  const error = connector();
+  const failure = new Error('callback failed');
+  const options = { onUnhandledPrismaError: () => assert.fail('Already matched'), fallback: () => assert.fail('Wrong route') };
+  assert.equal(createPrismaErrorHandler({}, {
+    ...options, constraints: { Account: { 'check normal email': () => undefined } },
+  })(error), undefined);
+  assert.throws(() => createPrismaErrorHandler({}, {
+    ...options, constraints: { Account: { 'check normal email': () => { throw failure; } } },
+  })(error), value => value === failure);
+});
+
+test('constraint maps are snapshotted and prototype names cannot hijack lookup', () => {
+  const constraints = { Account: { 'check normal email': () => 'original' } };
+  const handle = createPrismaErrorHandler({}, { constraints });
+  constraints.Account['check normal email'] = () => 'changed';
+  assert.equal(handle(connector()), 'original');
+  for (const error of [connector('new row for relation "toString" violates check constraint "constructor"'),
+    connector('new row for relation "Account" violates check constraint "toString"')]) {
+    assert.throws(() => handle(error), value => value === error);
+  }
+  const special = createPrismaErrorHandler({}, {
+    constraints: { ['__proto__']: { ['constructor']: () => 'explicit' } },
+  });
+  assert.equal(special(connector('new row for relation "__proto__" violates check constraint "constructor"')), 'explicit');
 });

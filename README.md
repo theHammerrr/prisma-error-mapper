@@ -87,7 +87,7 @@ function inspect(error: unknown) {
 
 A predicate cannot safely create missing properties or normalize an existing object without mutation. Consequently the raw guard deliberately requires `error.meta?.target`, not `error.meta.target`. Handler callbacks and `getPrismaErrorContext()` provide an always-present normalized `meta` object instead. The contexts are a discriminated union on `code`.
 
-`isPrismaError(error)` recognizes all five Prisma client error classes. `isPrismaKnownRequestError(error)` recognizes known request errors even with unsupported codes; its metadata remains Prisma's unvalidated `Record<string, unknown>`. Code-specific guards additionally validate supported metadata fields. Malformed metadata fails the code-specific guard and follows the handler's fallback policy. Missing metadata is valid.
+`isPrismaError(error)` recognizes all five Prisma client error classes. `isPrismaKnownRequestError(error)` recognizes known request errors even with unsupported codes; its metadata remains Prisma's unvalidated `Record<string, unknown>`. Code-specific guards additionally validate supported metadata fields. Malformed metadata fails the code-specific guard and follows the unmatched Prisma policy. Missing metadata is valid.
 
 ## Hebrew and an existing application Error class
 
@@ -145,23 +145,73 @@ try {
 }
 ```
 
-Overrides replace or add mappings for that call only. They do not mutate the original handler. Return types include base and override results conservatively, including base results whose callbacks may have been replaced.
+Overrides replace or add Prisma-code mappings for that call only. They do not mutate the original handler. Return types include base and override results conservatively, including base results whose callbacks may have been replaced. Named CHECK mappings are configured when constructing a handler, not through this code-override argument.
+
+## Named PostgreSQL CHECK constraints
+
+Register frequently used constraints directly. Keys are the exact **database table name**, then constraint name, including spaces:
+
+```ts
+const handle = createPrismaErrorHandler(
+  {
+    [PrismaErrorCodes.RecordNotFound]: () =>
+      new AppError(404, 'הרשומה לא נמצאה', 'NOT_FOUND'),
+  },
+  {
+    constraints: {
+      Account: {
+        'check normal email': () => new AppError(
+          422,
+          'האימייל אינו יכול להתחיל ב־123',
+          'INVALID_EMAIL_PREFIX',
+        ),
+      },
+    },
+  },
+);
+
+try {
+  await prisma.account.update({ where: { id }, data: { email } });
+} catch (error) {
+  throw handle(error);
+}
+```
+
+This is a handled error: no fallback is needed. Registering `constraints` opts into the verified PostgreSQL CHECK parser. Each callback receives a typed `ParsedPrismaPostgresError` with `tableName`, `constraintName`, `sqlState`, `source`, and `original`; its return value is inferred alongside code mappings. Use `PrismaConstraintHandlerMap` with `satisfies` for reusable maps. Both map levels are snapshotted when the handler is created.
+
+Constraint names are scoped to table names so the same name can be used on different tables. The observed messages omit schema names: use separate handlers for separate schema contexts if schemas contain identically named tables and constraints. Database names may differ from Prisma model names through `@@map`.
+
+Only PostgreSQL CHECK violations recognized by the parser are supported here. Named UNIQUE constraints still use P2002 metadata; triggers, foreign-key constraints, and arbitrary database messages are not implicitly parsed. Unsupported formats remain unmatched Prisma errors. Parser limitations are described below.
 
 ## Unknown errors and centralized handling
 
 By default, all unmapped inputs are **re-thrown unchanged**: unrelated errors, unsupported codes, validation errors, malformed metadata, and supported codes without a callback. This preserves original identity, stack, and non-Error thrown values. Callback exceptions also propagate unchanged.
+
+Routing is explicit:
+
+1. A per-call Prisma code override, or the base code mapping.
+2. A configured table/constraint mapping, if CHECK parsing succeeds.
+3. `onUnhandledPrismaError` for a recognized Prisma error that has not matched either mapping.
+4. `fallback` for non-Prisma inputs only.
+
+Both hooks are optional and otherwise rethrow the original input. A callback that returns `undefined` has still handled the error; routing does not continue. A callback exception propagates unchanged.
 
 For a centralized boundary that prefers returning the original value:
 
 ```ts
 const preserve = createPrismaErrorHandler({
   P2025: () => ({ message: 'Missing record' }),
-}, { fallback: error => error });
+}, {
+  onUnhandledPrismaError: error => error, // error is typed as PrismaError
+  fallback: error => error, // error is unknown
+});
 
 const result = preserve(error); // unknown, necessarily: fallback accepts unknown
 ```
 
 A typed fallback such as `fallback: () => new AppError(500, 'Unexpected error')` instead yields the union of callback and fallback return types. It intentionally converts unrelated errors because the application explicitly opted in.
+
+**Migrating from 0.1.x to 0.2.0:** `fallback` previously received all unmatched inputs. It now receives only non-Prisma inputs. Move Prisma-specific fallback logic to `constraints` or `onUnhandledPrismaError`. To retain a shared catch-all policy, assign the same function to both hooks. Existing code mappings, enum values, and per-call code overrides remain compatible.
 
 ```ts
 import { getPrismaErrorKind } from 'prisma-error-mapper';
@@ -196,7 +246,7 @@ const diagnostic = parsePrismaPostgresError(error);
 // }
 
 const handle = createPrismaErrorHandler({}, {
-  fallback: (error) => {
+  onUnhandledPrismaError: (error) => {
     const diagnostic = parsePrismaPostgresError(error);
     if (
       diagnostic?.tableName === 'Account' &&
@@ -248,7 +298,7 @@ Add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts` and a se
 
 Runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`, `parsePrismaPostgresError`.
 
-Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`, `ParsedPrismaPostgresError`.
+Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaConstraintHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`, `ParsedPrismaPostgresError`.
 
 ## Development and packaging
 
@@ -272,7 +322,7 @@ ALTER TABLE "Account"
 
 This rejects inserts and updates when the email starts with `123`; values containing `123` elsewhere remain allowed. The quoted name preserves its spaces. It is a prefix rule, not general email validation. The fixture's email column is already non-nullable.
 
-With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request` and preserves them through its default rethrow or configured fallback. Applications can explicitly call `parsePrismaPostgresError` to derive a separate diagnostic structure. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a Prisma-provided constraint-name field. Integration tests cover parsing both paths and verify that rejected updates leave the original email intact.
+With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request`. Configured `constraints` mappings handle them directly; unmatched Prisma errors otherwise rethrow or reach `onUnhandledPrismaError`. Applications can also explicitly call `parsePrismaPostgresError` to derive a separate diagnostic structure. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a Prisma-provided constraint-name field. Integration tests cover parsing and direct mapping on both paths and verify that rejected updates leave the original email intact.
 
 Start Docker Desktop (Linux containers) or a local Docker Engine, then run:
 

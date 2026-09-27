@@ -55,15 +55,18 @@ test('check normal email rejects an insert and preserves Prisma unknown-request 
     tableName: 'Account', constraintName: 'check normal email', source: 'message', original: error,
   });
   const applicationError = new Error('האימייל אינו יכול להתחיל ב־123');
-  const handler = createPrismaErrorHandler({}, { fallback: original => {
-    const parsed = parsePrismaPostgresError(original);
-    if (parsed?.tableName === 'Account' && parsed.constraintName === 'check normal email') return applicationError;
-    throw original;
-  } });
+  const handler = createPrismaErrorHandler({}, {
+    constraints: { Account: { 'check normal email': ({ original }) => {
+      assert.equal(original, error);
+      return applicationError;
+    } } },
+    fallback: () => assert.fail('Prisma errors must not reach fallback'),
+    onUnhandledPrismaError: () => assert.fail('The constraint is explicitly handled'),
+  });
   assert.equal(handler(error), applicationError);
   assert.equal(getPrismaErrorContext(error), undefined);
   assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
-  assert.equal(createPrismaErrorHandler({}, { fallback: value => value })(error), error);
+  assert.equal(createPrismaErrorHandler({}, { onUnhandledPrismaError: value => value })(error), error);
   assert.equal(await prisma.account.count(), 0);
 });
 
@@ -82,6 +85,9 @@ test('check normal email rejects updates and leaves the previous email unchanged
   assert.equal(getPrismaErrorKind(error), 'unknown-request');
   assert.match(error.message, /check normal email/);
   assert.equal(parsePrismaPostgresError(error)?.constraintName, 'check normal email');
+  assert.equal(createPrismaErrorHandler({}, {
+    constraints: { Account: { 'check normal email': () => 'update rejected' } },
+  })(error), 'update rejected');
   const unchanged = await prisma.account.findUniqueOrThrow({ where: { id: account.id } });
   assert.equal(unchanged.email, account.email);
 });
@@ -100,6 +106,9 @@ test('check normal email through raw SQL exposes P2010 with SQLSTATE 23514', asy
     provider: 'postgresql', kind: 'check-constraint', sqlState: '23514',
     tableName: 'Account', constraintName: 'check normal email', source: 'raw-query-meta', original: error,
   });
+  assert.equal(createPrismaErrorHandler({}, {
+    constraints: { Account: { 'check normal email': ({ source }) => source } },
+  })(error), 'raw-query-meta');
   assert.equal(getPrismaErrorContext(error), undefined);
   assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
   assert.equal(await prisma.account.count(), 0);
@@ -188,7 +197,7 @@ test('nested connect to a missing related record yields P2025', async () => {
   assert.equal(await prisma.post.count(), 0);
 });
 
-test('unsupported P2003 foreign-key errors follow the unchanged fallback policy', async () => {
+test('unsupported P2003 foreign-key errors follow the unmatched Prisma policy', async () => {
   const error = await rejected(prisma.post.create({ data: { title: 'orphan', accountId: -1 } }));
   assert.ok(isPrismaKnownRequestError(error));
   assert.equal(error.code, 'P2003');
@@ -196,7 +205,7 @@ test('unsupported P2003 foreign-key errors follow the unchanged fallback policy'
   assert.equal(getPrismaErrorContext(error), undefined);
   const handler = createPrismaErrorHandler({ P2002: () => 'duplicate' });
   assert.throws(() => handler(error), value => value === error);
-  assert.equal(createPrismaErrorHandler({}, { fallback: value => value })(error), error);
+  assert.equal(createPrismaErrorHandler({}, { onUnhandledPrismaError: value => value })(error), error);
 });
 
 test('raw SQL duplicate is P2010 with SQLSTATE 23505, not an ORM P2002', async () => {
