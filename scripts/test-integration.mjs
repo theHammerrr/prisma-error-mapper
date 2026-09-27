@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 // PostgreSQL 16.15 multi-platform image; update intentionally with the integration baseline.
 const image = 'postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';
 const env = { ...process.env };
-const controller = new AbortController();
+const controller = new globalThis.AbortController();
 let container;
 let logs;
 
