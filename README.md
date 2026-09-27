@@ -12,6 +12,32 @@ npm install prisma-error-mapper @prisma/client@~6.14.0
 
 For local use, run `npm install`, `npm pack`, then install the generated tarball in your application. Keep your application's `prisma` CLI on the same 6.14.x version as its client.
 
+## Coding-agent integration
+
+Use the [consumer integration guide](docs/integration-guide.md) when adding this
+package to an existing application. It covers application error classes, translations,
+named CHECK constraints, overrides, and error routing.
+
+For agents supporting skills, copy the complete
+[`skills/use-prisma-error-mapper`](skills/use-prisma-error-mapper) directory into your
+application's `.agents/skills/use-prisma-error-mapper` directory. The same directory
+is included in the npm tarball under `node_modules/prisma-error-mapper/skills` after
+installation. Copy its `references` directory too; the guide is bundled there so
+the skill works independently of the package repository.
+
+In Codex, invoke it with, for example:
+
+```text
+$use-prisma-error-mapper Integrate Prisma error handling into the account service.
+Use our existing AppError and translations, and handle the Account table's
+"check normal email" CHECK constraint.
+```
+
+Installing the npm dependency does not automatically activate an agent skill.
+Agents without skill support can read the integration guide directly. These are
+instructions for consuming the package, not repository maintenance instructions.
+When updating the package, refresh the copied skill and compare the installed API.
+
 ## Basic usage and custom messages
 
 ```ts
