@@ -9,7 +9,7 @@ export function typeAssertions(error: unknown): void {
       expect<Equal<typeof context, ParsedPrismaPostgresError>>();
       expect<Equal<typeof context.sqlState, '23514'>>();
       // @ts-expect-error Derived diagnostics are separate from Prisma metadata.
-      context.meta;
+      void context.meta;
       return new AppError();
     } } },
   });
@@ -40,10 +40,10 @@ export function typeAssertions(error: unknown): void {
     expect<Equal<typeof diagnostic.kind, 'check-constraint'>>();
     expect<Equal<typeof diagnostic.constraintName, string>>();
     // @ts-expect-error Parsed diagnostics are not Prisma metadata.
-    diagnostic.meta;
+    void diagnostic.meta;
     if (diagnostic.source === 'message') {
       // @ts-expect-error The unknown-request original has no Prisma code.
-      diagnostic.original.code;
+      void diagnostic.original.code;
     } else {
       expect<Equal<typeof diagnostic.original.code, string>>();
     }
@@ -60,7 +60,7 @@ export function typeAssertions(error: unknown): void {
     const cause = error.meta?.cause;
     expect<Equal<typeof cause, string | undefined>>();
     // @ts-expect-error A missing-record error does not have unique-constraint metadata.
-    error.meta?.target;
+    void error.meta?.target;
   }
   if (isPrismaError(error, PrismaErrorCodes.UniqueConstraintViolation)) {
     const target = error.meta?.target;
@@ -72,7 +72,7 @@ export function typeAssertions(error: unknown): void {
   }
   if (isPrismaError(error, PrismaErrorCodes.SchemaValidationFailed)) {
     // @ts-expect-error Initialization errors do not expose code.
-    error.code;
+    void error.code;
     if ('errorCode' in error) expect<Equal<typeof error.errorCode, PrismaErrorCodes.SchemaValidationFailed>>();
   }
   const semanticHandler = createPrismaErrorHandler({
@@ -104,15 +104,15 @@ export function typeAssertions(error: unknown): void {
     const target = error.meta?.target;
     expect<Equal<typeof target, string[] | string | null | undefined>>();
     // @ts-expect-error Raw Prisma metadata is optional.
-    error.meta.target;
+    void error.meta.target;
     // @ts-expect-error P2025 metadata does not belong to P2002.
-    error.meta?.cause;
+    void error.meta?.cause;
   }
   if (isPrismaError(error, 'P2015')) { const details = error.meta?.details; expect<Equal<typeof details, string | undefined>>(); }
   if (isPrismaError(error, 'P2025')) { const cause = error.meta?.cause; expect<Equal<typeof cause, string | undefined>>(); }
   if (isPrismaError(error, 'P1012')) {
     // @ts-expect-error Initialization errors do not expose code.
-    error.code;
+    void error.code;
     if ('errorCode' in error) expect<Equal<typeof error.errorCode, 'P1012'>>();
   }
   const handler = createPrismaErrorHandler({
@@ -120,7 +120,7 @@ export function typeAssertions(error: unknown): void {
       expect<Equal<typeof code, 'P2002'>>();
       expect<Equal<typeof meta.target, readonly string[] | undefined>>();
       // @ts-expect-error Wrong metadata for this code.
-      meta.cause;
+      void meta.cause;
       return new AppError(meta.target?.[0]);
     },
     P2025: ({ meta }) => { expect<Equal<typeof meta.cause, string | undefined>>(); return new AppError(); },
