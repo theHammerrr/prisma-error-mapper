@@ -1,0 +1,51 @@
+{
+  "name": "prisma-error-mapper",
+  "version": "0.1.0",
+  "description": "Typed Prisma 6.14 error guards and provider-aware application mappings",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@prisma/client": "~6.14.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/runtime.test.js",
+    "test:integration": "node scripts/test-integration.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
+    "prepack": "npm run check"
+  },
+  "keywords": [],
+  "author": "theHammerrr",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theHammerrr/prisma-error-mapper.git"
+  },
+  "homepage": "https://github.com/theHammerrr/prisma-error-mapper#readme",
+  "bugs": { "url": "https://github.com/theHammerrr/prisma-error-mapper/issues" },
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@prisma/client": "6.14.0",
+    "@types/node": "22.20.4",
+    "prisma": "6.14.0",
+    "typescript": "5.9.2"
+  }
+}

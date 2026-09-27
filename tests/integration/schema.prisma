@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PRISMA_ERROR_TEST_DATABASE_URL")
+}
+
+model Account {
+  id         Int    @id @default(autoincrement())
+  email      String @unique
+  alias      String @unique(map: "account_alias_explicit")
+  externalId String @unique(map: "account_external_explicit") @map("external_id")
+  tenant     String
+  slug       String
+  posts      Post[]
+
+  @@unique([tenant, slug], map: "account_tenant_slug_explicit")
+}
+
+model Membership {
+  id     Int    @id @default(autoincrement())
+  teamId String
+  userId String
+
+  @@unique([teamId, userId])
+}
+
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String
+  accountId Int
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+}
+
+// SQL UNIQUE constraints are added in setup, independently of Prisma's indexes.
+model NativeConstraint {
+  id          Int    @id @default(autoincrement())
+  defaultName String
+  customName  String
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.test-build/
+.integration-build/
+*.tgz
+.env
+.env.*
+!.env.example

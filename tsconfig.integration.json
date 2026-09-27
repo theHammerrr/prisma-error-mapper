@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.test.json",
+  "compilerOptions": { "outDir": ".integration-build" },
+  "include": ["src/**/*.ts", "tests/integration/**/*.ts"]
+}
