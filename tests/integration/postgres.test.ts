@@ -1,24 +1,67 @@
-import { after, before, beforeEach, test } from 'node:test';
+import { afterAll, beforeAll, beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { PrismaClient } from '@prisma/client';
 import {
   PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, getPrismaErrorKind,
   isPrismaError, isPrismaKnownRequestError, parsePrismaPostgresError,
 } from '../../src/index.js';
 
-const prisma = new PrismaClient();
-before(async () => {
+const require = createRequire(import.meta.url);
+const execFileAsync = promisify(execFile);
+// PostgreSQL 16.15; update intentionally with the integration baseline.
+const image = 'postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';
+let container: StartedPostgreSqlContainer | undefined;
+let prisma: PrismaClient;
+
+beforeAll(async () => {
+  container = await new PostgreSqlContainer(image)
+    .withDatabase('prisma_errors')
+    .withUsername('prisma_test')
+    .withPassword(randomUUID())
+    .withTmpFs({ '/var/lib/postgresql/data': 'rw' })
+    .withStartupTimeout(120_000)
+    .start();
+  console.info(`Integration container: ${container.getId()}`);
+  const url = new URL(container.getConnectionUri());
+  url.searchParams.set('schema', 'public');
+  url.searchParams.set('connect_timeout', '5');
+  // Setup and queries always target this container, never a caller's database URL.
+  await execFileAsync(process.execPath, [require.resolve('prisma/build/index.js'),
+    'db', 'push', '--skip-generate', '--schema', fileURLToPath(new URL('./schema.prisma', import.meta.url)),
+  ], {
+    env: { ...process.env, PRISMA_ERROR_TEST_DATABASE_URL: url.href },
+    timeout: 120_000,
+  });
+  prisma = new PrismaClient({ datasourceUrl: url.href });
   await prisma.$connect();
+  await prisma.$executeRawUnsafe(await readFile(new URL('./check-normal-email.sql', import.meta.url), 'utf8'));
   await prisma.$executeRaw`ALTER TABLE "NativeConstraint" ADD UNIQUE ("defaultName")`;
   await prisma.$executeRaw`ALTER TABLE "NativeConstraint" ADD CONSTRAINT "native_custom_unique" UNIQUE ("customName")`;
-});
+}, 300_000);
 beforeEach(async () => {
   await prisma.post.deleteMany();
   await prisma.account.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.nativeConstraint.deleteMany();
 });
-after(async () => { await prisma.$disconnect(); });
+afterAll(async () => {
+  try {
+    await prisma?.$disconnect();
+  } finally {
+    if (container) {
+      await container.stop({ timeout: 10_000, remove: true, removeVolumes: true });
+      console.info(`Removed integration container: ${container.getId()}`);
+    }
+  }
+}, 30_000);
 
 async function rejected(operation: PromiseLike<unknown>): Promise<unknown> {
   try { await operation; } catch (error) { return error; }

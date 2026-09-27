@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { PrismaClientKnownRequestError as Known, PrismaClientUnknownRequestError as Unknown } from '@prisma/client/runtime/library.js';
 import { createPrismaErrorHandler, parsePrismaPostgresError } from '../src/index.js';
