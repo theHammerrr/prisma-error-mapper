@@ -40,6 +40,55 @@ const accountData = (suffix: string) => ({
   email: `${suffix}@example.test`, alias: suffix, externalId: suffix, tenant: suffix, slug: suffix,
 });
 
+test('check normal email rejects an insert and preserves Prisma unknown-request diagnostics', async () => {
+  const error = await rejected(prisma.account.create({ data: accountData('123blocked') }));
+  assert.ok(isPrismaError(error));
+  assert.equal(error.name, 'PrismaClientUnknownRequestError');
+  assert.equal(getPrismaErrorKind(error), 'unknown-request');
+  assert.equal('code' in error, false);
+  assert.equal('meta' in error, false);
+  // Verify the observed diagnostic, without introducing message parsing into the package.
+  assert.match(error.message, /check normal email/);
+  assert.match(error.message, /23514/);
+  assert.equal(getPrismaErrorContext(error), undefined);
+  assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
+  assert.equal(createPrismaErrorHandler({}, { fallback: value => value })(error), error);
+  assert.equal(await prisma.account.count(), 0);
+});
+
+test('check normal email permits emails that do not begin with the exact prefix 123', async () => {
+  for (const [index, email] of ['normal@example.test', '12@example.test', 'a123@example.test', 'x@123.example.test'].entries()) {
+    const account = await prisma.account.create({ data: { ...accountData(`allowed-${index}`), email } });
+    assert.equal(account.email, email);
+  }
+  assert.equal(await prisma.account.count(), 4);
+});
+
+test('check normal email rejects updates and leaves the previous email unchanged', async () => {
+  const account = await prisma.account.create({ data: accountData('allowed') });
+  const error = await rejected(prisma.account.update({ where: { id: account.id }, data: { email: '123changed@example.test' } }));
+  assert.ok(isPrismaError(error));
+  assert.equal(getPrismaErrorKind(error), 'unknown-request');
+  assert.match(error.message, /check normal email/);
+  const unchanged = await prisma.account.findUniqueOrThrow({ where: { id: account.id } });
+  assert.equal(unchanged.email, account.email);
+});
+
+test('check normal email through raw SQL exposes P2010 with SQLSTATE 23514', async () => {
+  const error = await rejected(prisma.$executeRaw`
+    INSERT INTO "Account" ("email", "alias", "external_id", "tenant", "slug")
+    VALUES ('123raw@example.test', 'raw', 'raw', 'raw', 'raw')
+  `);
+  assert.ok(isPrismaKnownRequestError(error));
+  assert.equal(error.code, 'P2010');
+  assert.equal(error.meta?.code, '23514');
+  assert.equal(typeof error.meta?.message, 'string');
+  assert.match(String(error.meta?.message), /check normal email/);
+  assert.equal(getPrismaErrorContext(error), undefined);
+  assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
+  assert.equal(await prisma.account.count(), 0);
+});
+
 test('fixtures contain both explicit and database-generated names', async () => {
   const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
     SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
@@ -52,6 +101,10 @@ test('fixtures contain both explicit and database-generated names', async () => 
   `;
   assert.deepEqual(constraints.map(constraint => constraint.conname).sort(),
     ['NativeConstraint_defaultName_key', 'native_custom_unique'].sort());
+  const checks = await prisma.$queryRaw<Array<{ conname: string }>>`
+    SELECT conname FROM pg_constraint WHERE conrelid = '"Account"'::regclass AND contype = 'c'
+  `;
+  assert.deepEqual(checks, [{ conname: 'check normal email' }]);
 });
 
 for (const { label, duplicate, target } of [

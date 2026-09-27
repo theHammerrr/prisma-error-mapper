@@ -222,6 +222,18 @@ npm pack --dry-run
 
 ## PostgreSQL container integration tests
 
+The fixture also installs a custom named `CHECK` from `tests/integration/check-normal-email.sql`:
+
+```sql
+ALTER TABLE "Account"
+  ADD CONSTRAINT "check normal email"
+  CHECK ("email" NOT LIKE '123%');
+```
+
+This rejects inserts and updates when the email starts with `123`; values containing `123` elsewhere remain allowed. The quoted name preserves its spaces. It is a prefix rule, not general email validation. The fixture's email column is already non-nullable.
+
+With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request` and preserves them through its default rethrow or configured fallback; it does not parse the message into a fabricated constraint property. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a structured constraint-name field. Integration tests cover both paths and verify that rejected updates leave the original email intact.
+
 Start Docker Desktop (Linux containers) or a local Docker Engine, then run:
 
 ```sh

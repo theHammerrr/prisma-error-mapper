@@ -59,6 +59,7 @@ try {
   run(process.execPath, [prismaCli, 'generate', '--schema', 'tests/integration/schema.prisma']);
   run(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', 'tsconfig.integration.json']);
   run(process.execPath, [prismaCli, 'db', 'push', '--skip-generate', '--schema', 'tests/integration/schema.prisma']);
+  run(process.execPath, [prismaCli, 'db', 'execute', '--file', 'tests/integration/check-normal-email.sql', '--schema', 'tests/integration/schema.prisma']);
   run(process.execPath, ['--test', '--test-concurrency=1', '.integration-build/tests/integration/postgres.test.js']);
 } catch (error) {
   console.error(error);
