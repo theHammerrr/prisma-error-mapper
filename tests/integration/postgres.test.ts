@@ -2,7 +2,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PrismaClient } from '@prisma/client';
 import {
-  createPrismaErrorHandler, getPrismaErrorContext, getPrismaErrorKind,
+  PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, getPrismaErrorKind,
   isPrismaError, isPrismaKnownRequestError,
 } from '../../src/index.js';
 
@@ -100,7 +100,7 @@ for (const operation of ['findUniqueOrThrow', 'update', 'delete'] as const) {
       : operation === 'update' ? prisma.account.update({ where, data: { alias: 'missing' } })
       : prisma.account.delete({ where });
     const error = await rejected(query);
-    assert.ok(isPrismaError(error, 'P2025'));
+    assert.ok(isPrismaError(error, PrismaErrorCodes.RecordNotFound));
     assert.equal(typeof error.meta?.cause, 'string');
     const context = getPrismaErrorContext(error);
     assert.ok(context?.code === 'P2025');

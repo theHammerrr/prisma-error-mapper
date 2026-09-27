@@ -1,9 +1,54 @@
-import { createPrismaErrorHandler, getPrismaErrorContext, isPrismaError } from '../src/index.js';
-import type { PrismaErrorMeta, PrismaErrorHandlerMap } from '../src/index.js';
+import { PrismaErrorCodes, createPrismaErrorHandler, getPrismaErrorContext, isPrismaError } from '../src/index.js';
+import type { PrismaErrorCode, PrismaErrorMeta, PrismaErrorHandlerMap } from '../src/index.js';
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 function expect<T extends true>(..._proof: T extends true ? [] : never): void {}
 class AppError extends Error { status = 409; }
 export function typeAssertions(error: unknown): void {
+  expect<Equal<`${PrismaErrorCodes}`, PrismaErrorCode>>();
+  if (isPrismaError(error, PrismaErrorCodes.RecordNotFound)) {
+    expect<Equal<typeof error.code, PrismaErrorCodes.RecordNotFound>>();
+    const cause = error.meta?.cause;
+    expect<Equal<typeof cause, string | undefined>>();
+    // @ts-expect-error A missing-record error does not have unique-constraint metadata.
+    error.meta?.target;
+  }
+  if (isPrismaError(error, PrismaErrorCodes.UniqueConstraintViolation)) {
+    const target = error.meta?.target;
+    expect<Equal<typeof target, string[] | string | null | undefined>>();
+  }
+  if (isPrismaError(error, PrismaErrorCodes.RelatedRecordNotFound)) {
+    const details = error.meta?.details;
+    expect<Equal<typeof details, string | undefined>>();
+  }
+  if (isPrismaError(error, PrismaErrorCodes.SchemaValidationFailed)) {
+    // @ts-expect-error Initialization errors do not expose code.
+    error.code;
+    if ('errorCode' in error) expect<Equal<typeof error.errorCode, PrismaErrorCodes.SchemaValidationFailed>>();
+  }
+  const semanticHandler = createPrismaErrorHandler({
+    [PrismaErrorCodes.RecordNotFound]: ({ meta }) => {
+      expect<Equal<typeof meta.cause, string | undefined>>();
+      return new AppError();
+    },
+    [PrismaErrorCodes.UniqueConstraintViolation]: ({ meta }) => {
+      expect<Equal<typeof meta.target, readonly string[] | undefined>>();
+      return new AppError();
+    },
+  });
+  const semanticResult = semanticHandler(error);
+  expect<Equal<typeof semanticResult, AppError>>();
+  const semanticOverride = semanticHandler(error, {
+    [PrismaErrorCodes.RecordNotFound]: ({ meta }) => {
+      expect<Equal<typeof meta.cause, string | undefined>>();
+      return 404;
+    },
+  });
+  expect<Equal<typeof semanticOverride, AppError | number>>();
+  const semanticContext = getPrismaErrorContext(error);
+  if (semanticContext?.code === PrismaErrorCodes.RecordNotFound) {
+    expect<Equal<typeof semanticContext.meta.cause, string | undefined>>();
+  }
+  expect<Equal<PrismaErrorMeta<PrismaErrorCodes.RecordNotFound>, PrismaErrorMeta<'P2025'>>>();
   if (isPrismaError(error, 'P2002')) {
     expect<Equal<typeof error.code, 'P2002'>>();
     const target = error.meta?.target;

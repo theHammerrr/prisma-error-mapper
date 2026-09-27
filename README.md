@@ -31,6 +31,38 @@ try {
 
 The status numbers are application choices. Callbacks can return strings, plain objects, errors, or other values. The package supplies no default user-facing messages. `handle(error)` returns the mapping result; use `throw handle(error)` to throw it. A separate `.throw()` method adds no useful capability and is intentionally omitted. The API is synchronous; if you intentionally return a Promise, await it before throwing.
 
+## Semantic error-code enum
+
+Use `PrismaErrorCodes` wherever you would otherwise write a supported `"P..."` code:
+
+```ts
+import { PrismaErrorCodes, isPrismaError, createPrismaErrorHandler } from 'prisma-error-mapper';
+
+if (isPrismaError(error, PrismaErrorCodes.RecordNotFound)) {
+  console.log(error.meta?.cause); // string | undefined
+}
+
+const handle = createPrismaErrorHandler({
+  [PrismaErrorCodes.RecordNotFound]: () => new Error('הרשומה לא נמצאה'),
+  [PrismaErrorCodes.UniqueConstraintViolation]: ({ meta }) => ({
+    message: `Duplicate value for ${meta.target?.[0] ?? 'a unique field'}`,
+  }),
+});
+
+throw handle(error, {
+  [PrismaErrorCodes.RecordNotFound]: () => new Error('המשתמש לא נמצא'),
+});
+```
+
+| Enum member | Prisma value |
+| --- | --- |
+| `PrismaErrorCodes.UniqueConstraintViolation` | `P2002` |
+| `PrismaErrorCodes.RelatedRecordNotFound` | `P2015` |
+| `PrismaErrorCodes.RecordNotFound` | `P2025` |
+| `PrismaErrorCodes.SchemaValidationFailed` | `P1012` |
+
+This is a regular exported TypeScript string enum, usable at runtime from JavaScript too. Existing string codes and the `PrismaErrorCode` string-union type remain compatible. The semantic names do not change the underlying codes, metadata, or handling behavior. Use square brackets for enum-keyed mappings and overrides; callback metadata retains its code-specific inference.
+
 ## Type narrowing: original errors versus normalized contexts
 
 ```ts
@@ -170,11 +202,11 @@ The implementation was checked against the published **6.14.0** runtime declarat
 
 ## Adding another error code
 
-Add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts`; add runtime validation in `src/guards.ts` and an explicit normalization branch in `src/metadata.ts`. Add code-specific runtime and inference tests. Update the table and sources. Types alone do not enable runtime support: declaration merging is not a supported extension mechanism. All provider-dependent fields should remain optional. No message or HTTP mapping is required.
+Add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts` and a semantic member to `PrismaErrorCodes` in `src/codes.ts`; add runtime validation in `src/guards.ts` and an explicit normalization branch in `src/metadata.ts`. Add code-specific runtime and inference tests. Update the table and sources. Types alone do not enable runtime support: declaration merging is not a supported extension mechanism. All provider-dependent fields should remain optional. No message or HTTP mapping is required.
 
 ## Public exports
 
-Runtime: `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`.
+Runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`.
 
 Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`.
 

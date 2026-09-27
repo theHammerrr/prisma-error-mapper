@@ -5,7 +5,7 @@ import {
   PrismaClientValidationError as Validation, PrismaClientUnknownRequestError as Unknown,
   PrismaClientRustPanicError as Panic,
 } from '@prisma/client/runtime/library.js';
-import { isPrismaError, isPrismaKnownRequestError, getPrismaErrorContext, getPrismaErrorKind, createPrismaErrorHandler } from '../src/index.js';
+import { PrismaErrorCodes, isPrismaError, isPrismaKnownRequestError, getPrismaErrorContext, getPrismaErrorKind, createPrismaErrorHandler } from '../src/index.js';
 
 const version = '6.14.0';
 const known = (code: string, meta?: Record<string, unknown>) =>
@@ -13,6 +13,33 @@ const known = (code: string, meta?: Record<string, unknown>) =>
 class AppError extends Error {
   constructor(public status: number, message: string, public code?: string) { super(message); }
 }
+
+test('semantic enum values match Prisma codes and work with real error guards', () => {
+  for (const [semantic, code] of [
+    [PrismaErrorCodes.UniqueConstraintViolation, 'P2002'],
+    [PrismaErrorCodes.RelatedRecordNotFound, 'P2015'],
+    [PrismaErrorCodes.RecordNotFound, 'P2025'],
+    [PrismaErrorCodes.SchemaValidationFailed, 'P1012'],
+  ] as const) {
+    assert.equal(semantic, code);
+    assert.equal(isPrismaError(known(code), semantic), true);
+    assert.equal(isPrismaError(known('P9999'), semantic), false);
+  }
+  assert.equal(isPrismaError(new Init('schema', version, 'P1012'), PrismaErrorCodes.SchemaValidationFailed), true);
+});
+
+test('enum-keyed mappings and overrides preserve custom values and string compatibility', () => {
+  const custom = new AppError(404, 'הרשומה לא נמצאה');
+  const handler = createPrismaErrorHandler({
+    [PrismaErrorCodes.RecordNotFound]: () => custom,
+    [PrismaErrorCodes.UniqueConstraintViolation]: ({ meta }) => meta.target?.[0],
+  });
+  assert.equal(handler(known('P2025')), custom);
+  assert.equal(handler(known('P2002', { target: ['email'] })), 'email');
+  assert.equal(handler(known('P2025'), { [PrismaErrorCodes.RecordNotFound]: () => 'override' }), 'override');
+  assert.equal(handler(known('P2025'), { P2025: () => 'string override' }), 'string override');
+  assert.equal(handler(known('P2025')), custom);
+});
 
 test('recognizes all five real Prisma error classes and their distinct kinds', () => {
   const cases = [
