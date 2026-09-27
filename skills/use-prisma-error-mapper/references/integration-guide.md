@@ -209,6 +209,7 @@ duplication instead of casting a plain object to a Prisma error.
 
 CHECK parsing depends on the tested connector diagnostic/English PostgreSQL format.
 Unsupported/localized/changed formats, double quotes in identifiers, unsupported
-Rust escapes, and messages over 65,536 characters are left unmapped. Schema names
-are unavailable, so use separate handlers where schemas reuse table/constraint names.
+Rust escapes, and messages over 65,536 characters are left unmapped. The tested
+non-public schema diagnostic omits its schema name, so use separate handlers where
+schemas reuse table/constraint names.
 Keep default rethrow behavior or an explicit unhandled-Prisma policy for these cases.

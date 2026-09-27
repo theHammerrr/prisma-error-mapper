@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("PRISMA_ERROR_TEST_DATABASE_URL")
+  schemas  = ["billing", "public"]
 }
 
 // The named CHECK constraint is installed from check-normal-email.sql after db push.
@@ -18,6 +19,7 @@ model Account {
   posts      Post[]
 
   @@unique([tenant, slug], map: "account_tenant_slug_explicit")
+  @@schema("public")
 }
 
 model Membership {
@@ -26,6 +28,7 @@ model Membership {
   userId String
 
   @@unique([teamId, userId])
+  @@schema("public")
 }
 
 model Post {
@@ -33,6 +36,8 @@ model Post {
   title     String
   accountId Int
   account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@schema("public")
 }
 
 // SQL UNIQUE constraints are added in setup, independently of Prisma's indexes.
@@ -40,4 +45,14 @@ model NativeConstraint {
   id          Int    @id @default(autoincrement())
   defaultName String
   customName  String
+
+  @@schema("public")
+}
+
+// Verifies CHECK diagnostics for a model outside the public schema.
+model BillingConstraint {
+  id     Int @id @default(autoincrement())
+  number Int
+
+  @@schema("billing")
 }

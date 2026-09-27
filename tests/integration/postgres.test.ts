@@ -43,6 +43,7 @@ beforeAll(async () => {
   prisma = new PrismaClient({ datasourceUrl: url.href });
   await prisma.$connect();
   await prisma.$executeRawUnsafe(await readFile(new URL('./check-normal-email.sql', import.meta.url), 'utf8'));
+  await prisma.$executeRawUnsafe(await readFile(new URL('./check-billing-number.sql', import.meta.url), 'utf8'));
   await prisma.$executeRaw`ALTER TABLE "NativeConstraint" ADD UNIQUE ("defaultName")`;
   await prisma.$executeRaw`ALTER TABLE "NativeConstraint" ADD CONSTRAINT "native_custom_unique" UNIQUE ("customName")`;
 }, 300_000);
@@ -51,6 +52,7 @@ beforeEach(async () => {
   await prisma.account.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.nativeConstraint.deleteMany();
+  await prisma.billingConstraint.deleteMany();
 });
 afterAll(async () => {
   try {
@@ -155,6 +157,24 @@ test('check normal email through raw SQL exposes P2010 with SQLSTATE 23514', asy
   assert.equal(getPrismaErrorContext(error), undefined);
   assert.throws(() => createPrismaErrorHandler({})(error), value => value === error);
   assert.equal(await prisma.account.count(), 0);
+});
+
+test('a CHECK violation in a non-public schema is parsed and mapped', async () => {
+  const error = await rejected(prisma.billingConstraint.create({ data: { number: 0 } }));
+  assert.ok(isPrismaError(error));
+  assert.equal(getPrismaErrorKind(error), 'unknown-request');
+  assert.match(error.message, /billing number positive/);
+  const parsed = parsePrismaPostgresError(error);
+  assert.deepEqual(parsed, {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514',
+    tableName: 'BillingConstraint', constraintName: 'billing number positive',
+    source: 'message', original: error,
+  });
+  assert.equal(createPrismaErrorHandler({}, {
+    constraints: {
+      BillingConstraint: { 'billing number positive': () => 'number must be positive' },
+    },
+  })(error), 'number must be positive');
 });
 
 test('fixtures contain both explicit and database-generated names', async () => {

@@ -205,7 +205,7 @@ try {
 
 This is a handled error: no fallback is needed. Registering `constraints` opts into the verified PostgreSQL CHECK parser. Each callback receives a typed `ParsedPrismaPostgresError` with `tableName`, `constraintName`, `sqlState`, `source`, and `original`; its return value is inferred alongside code mappings. Use `PrismaConstraintHandlerMap` with `satisfies` for reusable maps. Both map levels are snapshotted when the handler is created.
 
-Constraint names are scoped to table names so the same name can be used on different tables. The observed messages omit schema names: use separate handlers for separate schema contexts if schemas contain identically named tables and constraints. Database names may differ from Prisma model names through `@@map`.
+Constraint names are scoped to table names so the same name can be used on different tables. Prisma 6.14/PostgreSQL 16 integration coverage includes a CHECK on a model in the non-public `billing` schema; its diagnostic reports the table as `BillingConstraint` and omits `billing`. Use separate handlers for separate schema contexts if schemas contain identically named tables and constraints. Database names may differ from Prisma model names through `@@map`.
 
 Only PostgreSQL CHECK violations recognized by the parser are supported here. Named UNIQUE constraints still use P2002 metadata; triggers, foreign-key constraints, and arbitrary database messages are not implicitly parsed. Unsupported formats remain unmatched Prisma errors. Parser limitations are described below.
 
@@ -374,6 +374,7 @@ Coverage includes:
 - Unsupported foreign-key P2003 and raw-query P2010 errors preserving the original error. A raw SQL duplicate reports P2010/SQLSTATE 23505 rather than P2002.
 - Batch transaction rollback and non-enumerable `batchRequestIdx`, plus concurrent inserts with one unique-constraint failure.
 - Hebrew custom error objects and per-operation overrides against actual database errors.
+- A named CHECK on a Prisma model in the non-public `billing` schema, including parser and handler routing.
 
 **Observed PostgreSQL behavior:** named and default-named constraints both produce column arrays in P2002 metadata, not constraint-name strings. Other providers can differ. P2015 remains covered by constructor-based unit tests; the real nested missing-record scenario here emits P2025, so the suite does not manufacture a P2015 response. Unknown-request errors and Rust panics are likewise unit-tested rather than induced by destabilizing the engine.
 
