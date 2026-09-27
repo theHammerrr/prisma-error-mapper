@@ -13,6 +13,17 @@ ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Postgr
   assert.equal('meta' in error, false);
 });
 
+test('parses a captured nested CHECK diagnostic emitted by a Windows PostgreSQL server', () => {
+  const error = nestedConnector();
+  assert.deepEqual(parsePrismaPostgresError(error), {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514', schemaName: 'public',
+    tableName: 'product', constraintName: 'price_value_check', source: 'message', original: error,
+  });
+  assert.equal(createPrismaErrorHandler({}, {
+    constraints: { product: { price_value_check: ({ schemaName }) => schemaName } },
+  })(error), 'public');
+});
+
 const primary = 'new row for relation "Account" violates check constraint "check normal email"';
 test('named CHECK mappings directly handle ORM and raw-query errors without fallback', () => {
   const appError = new Error('האימייל אינו יכול להתחיל ב־123');
@@ -39,6 +50,15 @@ function connector(message = primary, code = '23514', detail = 'row data'): Unkn
 function raw(meta: Record<string, unknown>, code = 'P2010'): Known {
   return new Known('Raw query failed', { code, meta, clientVersion: '6.14.0' });
 }
+function nestedConnector(
+  message = 'new row for relation "product" violates check constraint "price_value_check"',
+  schema: string | null = 'public', table: string | null = 'product',
+  constraint: string | null = 'price_value_check',
+): Unknown {
+  const optional = (value: string | null) => value === null ? 'None' : `Some(${JSON.stringify(value)})`;
+  return new Unknown(String.raw`Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Error { kind: Db, cause: Some(DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState("23514"), message: ${JSON.stringify(message)}, detail: Some("Failing row contains (1, -1)."), hint: None, position: None, where_: None, schema: ${optional(schema)}, table: ${optional(table)}, column: None, datatype: None, constraint: ${optional(constraint)}, file: Some("d:\\pginstaller_12.auto\\postgres.windows-x64\\src\\backend\\executor\\execMain.c"), line: Some(2022), routine: Some("ExecConstraints") }) }) }), transient: false })`, { clientVersion: '6.14.0' });
+}
 
 test('parses raw-query metadata and retains the original metadata untouched', () => {
   const error = raw({ code: '23514', message: `ERROR: ${primary}\nDETAIL: Failing row contains (123).` });
@@ -48,6 +68,43 @@ test('parses raw-query metadata and retains the original metadata untouched', ()
     tableName: 'Account', constraintName: 'check normal email', source: 'raw-query-meta', original: error,
   });
   assert.equal(error.meta, before);
+});
+
+test('parses a schema-qualified primary relation separately from structured schema metadata', () => {
+  const message = 'new row for relation "billing"."Invoice" violates check constraint "invoice_total_positive"';
+  const error = raw({ code: '23514', message });
+  assert.deepEqual(parsePrismaPostgresError(error), {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514', schemaName: 'billing',
+    tableName: 'Invoice', constraintName: 'invoice_total_positive', source: 'raw-query-meta', original: error,
+  });
+});
+
+test('validates nested structured identifiers against the primary CHECK message where possible', () => {
+  const qualified = 'new row for relation "public"."product" violates check constraint "price_value_check"';
+  for (const error of [
+    nestedConnector(undefined, 'public', 'other_table', 'price_value_check'),
+    nestedConnector(undefined, 'public', 'product', 'other_constraint'),
+    nestedConnector(qualified, 'other_schema', 'product', 'price_value_check'),
+  ]) assert.equal(parsePrismaPostgresError(error), undefined);
+
+  const withoutStructuredIdentifiers = nestedConnector(undefined, null, null, null);
+  assert.deepEqual(parsePrismaPostgresError(withoutStructuredIdentifiers), {
+    provider: 'postgresql', kind: 'check-constraint', sqlState: '23514',
+    tableName: 'product', constraintName: 'price_value_check', source: 'message', original: withoutStructuredIdentifiers,
+  });
+});
+
+test('treats the nested PostgreSQL server source path as optional diagnostic data', () => {
+  const error = nestedConnector();
+  error.message = error.message.replace(
+    String.raw`file: Some("d:\\pginstaller_12.auto\\postgres.windows-x64\\src\\backend\\executor\\execMain.c")`,
+    'file: None',
+  );
+  assert.match(error.message, /file: None/);
+  const parsed = parsePrismaPostgresError(error);
+  assert.equal(parsed?.schemaName, 'public');
+  assert.equal(parsed?.tableName, 'product');
+  assert.equal(parsed?.constraintName, 'price_value_check');
 });
 
 test('decodes Unicode and backslashes, and ignores Prisma callsite text and row details', () => {

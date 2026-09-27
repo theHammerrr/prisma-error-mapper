@@ -123,12 +123,15 @@ In the tested Prisma 6.14 engine, ORM CHECK failures are
 `PrismaClientUnknownRequestError`: they are Prisma errors but have no structured
 Prisma code or metadata. Registering `constraints` opts into the package's narrow
 message parser. Raw-query CHECK failures use P2010 with PostgreSQL SQLSTATE 23514
-in raw metadata. Both supported shapes can reach the same named CHECK mapping.
+in raw metadata. The parser also accepts a captured nested PostgreSQL database-error
+debug shape. These supported shapes can reach the same named CHECK mapping.
 
-The parsed context contains `provider`, `kind`, `sqlState`, `tableName`,
-`constraintName`, `source`, and `original`. These are package-generated information,
-not fields added to Prisma's `meta`. `parsePrismaPostgresError(error)` exposes this
-context directly when needed.
+The parsed context contains `provider`, `kind`, `sqlState`, optional `schemaName`,
+`tableName`, `constraintName`, `source`, and `original`. These are package-generated
+information, not fields added to Prisma's `meta`. `parsePrismaPostgresError(error)`
+exposes this context directly when needed. Nested structured table/constraint fields
+are checked against the primary message. A structured schema is kept separately; it
+is never prepended to an unqualified relation name.
 
 PostgreSQL unique constraints are different: P2002 reports database columns in
 `meta.target` even for explicitly named unique constraints. Match the actual columns
@@ -207,9 +210,12 @@ Guards use Prisma class identity. Different runtime copies, alternate generators
 cross-realm errors, and serialized errors may not match. Resolve dependency/runtime
 duplication instead of casting a plain object to a Prisma error.
 
-CHECK parsing depends on the tested connector diagnostic/English PostgreSQL format.
+CHECK parsing depends on the supported connector diagnostic/English PostgreSQL format.
 Unsupported/localized/changed formats, double quotes in identifiers, unsupported
 Rust escapes, and messages over 65,536 characters are left unmapped. The tested
-non-public schema diagnostic omits its schema name, so use separate handlers where
-schemas reuse table/constraint names.
+live non-public schema diagnostic omits its schema name. Nested structured diagnostics
+and actually schema-qualified primary relations can expose `schemaName`, but handler
+lookup remains table/constraint based, so use separate handlers where schemas reuse
+table/constraint names. Server `file` paths are diagnostic data and are not used for
+parsing or OS detection.
 Keep default rethrow behavior or an explicit unhandled-Prisma policy for these cases.

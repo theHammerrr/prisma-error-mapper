@@ -203,9 +203,9 @@ try {
 }
 ```
 
-This is a handled error: no fallback is needed. Registering `constraints` opts into the verified PostgreSQL CHECK parser. Each callback receives a typed `ParsedPrismaPostgresError` with `tableName`, `constraintName`, `sqlState`, `source`, and `original`; its return value is inferred alongside code mappings. Use `PrismaConstraintHandlerMap` with `satisfies` for reusable maps. Both map levels are snapshotted when the handler is created.
+This is a handled error: no fallback is needed. Registering `constraints` opts into the verified PostgreSQL CHECK parser. Each callback receives a typed `ParsedPrismaPostgresError` with `tableName`, `constraintName`, optional `schemaName`, `sqlState`, `source`, and `original`; its return value is inferred alongside code mappings. Use `PrismaConstraintHandlerMap` with `satisfies` for reusable maps. Both map levels are snapshotted when the handler is created.
 
-Constraint names are scoped to table names so the same name can be used on different tables. Prisma 6.14/PostgreSQL 16 integration coverage includes a CHECK on a model in the non-public `billing` schema; its diagnostic reports the table as `BillingConstraint` and omits `billing`. Use separate handlers for separate schema contexts if schemas contain identically named tables and constraints. Database names may differ from Prisma model names through `@@map`.
+Constraint names are scoped to table names so the same name can be used on different tables. Handler lookup remains table/constraint based; it does not route by `schemaName`. Prisma 6.14/PostgreSQL 16 integration coverage includes a CHECK on a model in the non-public `billing` schema, but the live flattened diagnostic reports only `BillingConstraint`. A nested diagnostic can expose a separately validated structured schema, and an explicitly schema-qualified primary relation is also recognized. Use separate handlers for separate schema contexts if a diagnostic omits the schema or if schemas contain identically named tables and constraints. Database names may differ from Prisma model names through `@@map`.
 
 Only PostgreSQL CHECK violations recognized by the parser are supported here. Named UNIQUE constraints still use P2002 metadata; triggers, foreign-key constraints, and arbitrary database messages are not implicitly parsed. Unsupported formats remain unmatched Prisma errors. Parser limitations are described below.
 
@@ -254,7 +254,7 @@ switch (getPrismaErrorKind(error)) {
 
 ## Structured PostgreSQL CHECK diagnostics (opt-in)
 
-`parsePrismaPostgresError(error)` derives a separate structure from the Prisma 6.14 PostgreSQL CHECK failure format verified by the integration tests. It supports ORM unknown-request diagnostics and raw-query P2010 metadata with SQLSTATE 23514. It does not parse arbitrary Prisma messages or other constraint types.
+`parsePrismaPostgresError(error)` derives a separate structure from narrow PostgreSQL CHECK failure formats. It supports the flattened `QueryError(PostgresError { ... })` ORM diagnostic verified against Prisma 6.14, a captured nested `QueryError(Error { kind: Db, cause: Some(DbError { ... }) })` diagnostic, and raw-query P2010 metadata with SQLSTATE 23514. It does not parse arbitrary Prisma messages or other constraint types.
 
 ```ts
 import { parsePrismaPostgresError, createPrismaErrorHandler } from 'prisma-error-mapper';
@@ -290,7 +290,9 @@ throw handle(error);
 
 `sqlState` is a PostgreSQL code, not a Prisma `P...` code. `source` is `message` for unknown-request errors or `raw-query-meta` for P2010. The exported `ParsedPrismaPostgresError` type narrows the `original` error type by `source`. The derived structure is never inserted into `original.meta`, and existing guards and handler mappings remain unchanged.
 
-Parsing is best-effort and format-dependent. The parser requires a real Prisma error instance, the matching SQLSTATE, and the recognized primary PostgreSQL CHECK message. It ignores row details when identifying the constraint. Unsupported or malformed inputs return `undefined` without throwing. Localized/changed formats, identifiers containing double quotes, Rust debug escapes outside the supported JSON-compatible subset, and messages longer than 65,536 characters are deliberately unsupported. This is not a stable PostgreSQL protocol decoder: retain the original error as a fallback and rerun integration tests when upgrading Prisma.
+For the nested shape, present `schema`, `table`, and `constraint` fields are checked against the primary message where that message carries the same information. `schemaName` is returned only from a structured schema field or an actual primary relation of the form `"schema"."table"`; a structured `schema: Some("public")` never turns the unqualified relation `"product"` into the table name `public.product`. PostgreSQL's `file`, `line`, and `routine` fields identify the server source location. A Windows path in `file` is diagnostic data from the PostgreSQL server build and does not select a parser or host-OS code path.
+
+Parsing is best-effort and format-dependent. The parser requires a real Prisma error instance, the matching SQLSTATE, and the recognized primary PostgreSQL CHECK message. It ignores row details and server source paths when identifying the constraint. Unsupported, inconsistent, or malformed inputs return `undefined` without throwing. Localized/changed formats, identifiers containing double quotes, Rust debug escapes outside the supported JSON-compatible subset, and messages longer than 65,536 characters are deliberately unsupported. This is not a stable PostgreSQL protocol decoder: retain the original error as a fallback and rerun integration tests when upgrading Prisma.
 
 ## Supported codes and metadata
 
