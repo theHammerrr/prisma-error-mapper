@@ -1,6 +1,6 @@
 # prisma-error-mapper
 
-Framework-agnostic Prisma 6.14 error guards and typed application mappings. ESM, TypeScript 5.9.2, Node.js 22+. No framework, translation library, HTTP policy, or mandatory application error class. The only runtime requirement is the `@prisma/client` peer dependency.
+Framework-agnostic Prisma 6 and 7 error guards and typed application mappings. ESM, TypeScript 5.9.2, Node.js 22+. No framework, translation library, HTTP policy, or mandatory application error class. The only runtime requirement is the `@prisma/client` peer dependency.
 
 ## Installation
 
@@ -11,6 +11,8 @@ npm install prisma-error-mapper @prisma/client@~6.14.0
 ```
 
 For local use, run `npm install`, `npm pack`, then install the generated tarball in your application. Keep your application's `prisma` CLI on the same 6.14.x version as its client.
+
+The root import in the examples below is the Prisma 6.14 API. Prisma 7 applications use the separate [`prisma-error-mapper/prisma7` entrypoint](docs/prisma-7.md) and pass the `Prisma` namespace from their generated client. The two entrypoints share a package version but bind to their respective runtime constructors. The Prisma 7 entrypoint currently covers the typed error-code mappings; PostgreSQL CHECK diagnostic parsing remains scoped to Prisma 6.14.
 
 ## Coding-agent integration
 

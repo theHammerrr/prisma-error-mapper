@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "prisma generate --config prisma.config.ts",
+    "verify": "npm run generate && tsc -p ../../tsconfig.prisma7.json --noEmit && vitest run --config vitest.prisma7.config.ts --root ../.."
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0"
+  },
+  "devDependencies": {
+    "prisma": "7.10.0"
+  }
+}
