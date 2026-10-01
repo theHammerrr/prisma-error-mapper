@@ -4,6 +4,8 @@ This project follows [Semantic Versioning](https://semver.org/). Each future rel
 
 ## [0.3.0](https://github.com/theHammerrr/prisma-error-mapper/compare/v0.2.0...v0.3.0) (2026-10-01)
 
+Compatible with `@prisma/client` 6.14.x through the root entrypoint and 7.10.x through `prisma-error-mapper/prisma7`.
+
 
 ### Features
 
