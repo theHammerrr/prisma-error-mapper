@@ -1,10 +1,12 @@
 # Integrating prisma-error-mapper into an application
 
-This guide describes package 0.2.x: ESM, Node.js 22+, TypeScript 5.9.2, and
-`@prisma/client` 6.14.x with the default `prisma-client-js` generator. The package
-has not yet been published to npm. Install a tarball produced by `npm pack` in the
-package repository; keep the application's Prisma CLI and client versions aligned.
-Check the installed version and public declarations before applying these examples.
+This guide describes the package's Prisma 6 root entrypoint in 0.3.0: ESM, Node.js
+22+, TypeScript 5.9.2, and `@prisma/client` 6.14.x with the default
+`prisma-client-js` generator. Install `prisma-error-mapper` from npm and keep the
+application's Prisma CLI and client versions aligned. Prisma 7.10.x applications
+use the separate `prisma-error-mapper/prisma7` entrypoint; see the package's
+`docs/prisma-7.md` for its generated-client setup. Check the installed version
+and public declarations before applying these Prisma 6 examples.
 
 ## Choose the application boundary
 
@@ -202,9 +204,10 @@ application uses it. Never run destructive fixture setup against an application 
 
 ## Compatibility limits
 
-The package has been tested with Node 22/24, Prisma 6.14.0, and PostgreSQL 16.15.
-PostgreSQL 15, other providers, and Prisma 7 need separate integration verification.
-Do not infer Prisma 7 compatibility from similar exported type names.
+These examples have been tested with Node 22/24, Prisma 6.14.0, and PostgreSQL
+16.15. PostgreSQL 15 and other providers remain unverified. The package's
+Prisma 7 entrypoint has its own generated-client and PostgreSQL integration tests;
+do not apply the Prisma 6 CHECK-parsing examples to that entrypoint.
 
 Guards use Prisma class identity. Different runtime copies, alternate generators,
 cross-realm errors, and serialized errors may not match. Resolve dependency/runtime

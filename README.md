@@ -4,13 +4,21 @@ Framework-agnostic Prisma 6 and 7 error guards and typed application mappings. E
 
 ## Installation
 
-The package is prepared for publishing; the name has not been reserved or published. Once published:
+Install the published package with the Prisma Client version used by your application:
 
 ```sh
 npm install prisma-error-mapper @prisma/client@~6.14.0
+npm install --save-dev prisma@~6.14.0
 ```
 
-For local use, run `npm install`, `npm pack`, then install the generated tarball in your application. Keep your application's `prisma` CLI on the same 6.14.x version as its client.
+For Prisma 7.10.x applications:
+
+```sh
+npm install prisma-error-mapper @prisma/client@~7.10.0
+npm install --save-dev prisma@~7.10.0
+```
+
+Use the [Prisma 7 entrypoint](docs/prisma-7.md). Keep your application's `prisma` CLI on the same minor version as its client; an unpinned `prisma` install currently selects Prisma 8.
 
 Release history is recorded in [CHANGELOG.md](CHANGELOG.md). Maintainers use the [release guide](docs/releasing.md) to prepare version bumps, Git tags, and GitHub releases.
 
@@ -315,24 +323,26 @@ The package-generated `context.code` unifies `code` and `errorCode`; `context.ki
 
 ## Prisma/provider limitations
 
-The implementation was checked against the published **6.14.0** runtime declarations and version-tagged source, not inferred from current Prisma versions. See [research notes](docs/prisma-6.14.md) for sources.
+The root entrypoint was checked against the published **6.14.0** runtime declarations and version-tagged source. See [research notes](docs/prisma-6.14.md) for sources. The [Prisma 7 entrypoint](docs/prisma-7.md) is tested separately with a generated 7.10.0 client.
 
 - `meta`, `batchRequestIdx`, initialization `errorCode`, and provider fields are optional. `batchRequestIdx` is non-enumerable; retain the original error instead of spreading it.
 - A string P2002 target may name a constraint rather than a column. Even array entries should not be treated as portable UI field identifiers without application knowledge.
-- Detection uses Prisma's real constructors from `@prisma/client/runtime/library.js`. Matching a name and code alone would convert unrelated errors. Separate runtime copies, realms, serialized errors, and some alternate generated-client runtimes may fail `instanceof`; they follow fallback. Use a shared/deduplicated client runtime. This is a Node package, not an edge-runtime compatibility layer.
+- The root entrypoint detects Prisma 6 errors with real constructors from `@prisma/client/runtime/library.js`; the Prisma 7 entrypoint uses constructors from the application's generated `Prisma` namespace. Matching a name and code alone would convert unrelated errors. Separate runtime copies, realms, and serialized errors may fail `instanceof`; they follow fallback. Use a shared/deduplicated client runtime. This is a Node package, not an edge-runtime compatibility layer.
 - Metadata validation handles ordinary Prisma values and rejects malformed fields. It does not promise security isolation from deliberately stateful getters or mutated prototypes.
-- Unit tests construct actual runtime classes without a database. A separate container integration suite exercises generated Prisma 6.14.0 queries against PostgreSQL 16.15; other providers remain unverified.
-- Prisma 7 is outside the peer range. Supporting it requires rechecking runtime export paths, class identity, adapter/provider metadata, and generated client behavior before widening the range.
+- Unit tests construct actual runtime classes without a database. Separate container integration suites exercise generated Prisma 6.14.0 and 7.10.0 clients against PostgreSQL 16.15; other providers remain unverified.
+- Prisma 7.10.x is supported through `prisma-error-mapper/prisma7`. Its adapter metadata and generated-client behavior are verified by the Prisma 7 fixture; PostgreSQL CHECK diagnostic parsing is only available through the Prisma 6 entrypoint.
 
 ## Adding another error code
 
-Add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts` and a semantic member to `PrismaErrorCodes` in `src/codes.ts`; add runtime validation in `src/guards.ts` and an explicit normalization branch in `src/metadata.ts`. Add code-specific runtime and inference tests. Update the table and sources. Types alone do not enable runtime support: declaration merging is not a supported extension mechanism. All provider-dependent fields should remain optional. No message or HTTP mapping is required.
+For the Prisma 6 root entrypoint, add its verified raw metadata to `PrismaErrorMetaMap` in `src/types.ts` and a semantic member to `PrismaErrorCodes` in `src/codes.ts`; add runtime validation in `src/guards.ts` and an explicit normalization branch in `src/metadata.ts`. Update `src/prisma7.ts` and the separate Prisma 7 fixture when extending that entrypoint. Add code-specific runtime and inference tests. Update the table and sources. Types alone do not enable runtime support: declaration merging is not a supported extension mechanism. All provider-dependent fields should remain optional. No message or HTTP mapping is required.
 
 ## Public exports
 
-Runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`, `parsePrismaPostgresError`.
+Prisma 6 root runtime: `PrismaErrorCodes`, `isPrismaError`, `isPrismaKnownRequestError`, `getPrismaErrorKind`, `getPrismaErrorContext`, `createPrismaErrorHandler`, `parsePrismaPostgresError`.
 
-Types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaConstraintHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`, `ParsedPrismaPostgresError`.
+Prisma 6 root types: `PrismaError`, `PrismaErrorCode`, `PrismaErrorForCode`, `PrismaErrorMeta`, `PrismaErrorMetaMap`, `NormalizedPrismaErrorMeta`, `PrismaErrorContext`, `PrismaErrorHandlerMap`, `PrismaConstraintHandlerMap`, `PrismaErrorHandler`, `PrismaErrorKind`, `ParsedPrismaPostgresError`.
+
+Prisma 7 runtime: `createPrisma7ErrorMapper`, which returns the guards, context helpers, and handler factory bound to the generated client's constructors. Its public types are declared in `src/prisma7.ts`.
 
 ## Development and packaging
 
@@ -386,7 +396,7 @@ Coverage includes:
 
 **Observed PostgreSQL behavior:** named and default-named constraints both produce column arrays in P2002 metadata, not constraint-name strings. Other providers can differ. P2015 remains covered by constructor-based unit tests; the real nested missing-record scenario here emits P2025, so the suite does not manufacture a P2015 response. Unknown-request errors and Rust panics are likewise unit-tested rather than induced by destabilizing the engine.
 
-CI runs unit/build checks and a separate container integration job on Node 22 and 24. `npm run check` and `npm pack` stay Docker-independent.
+CI runs unit/build checks and separate Prisma 6 and 7 container integration jobs on Node 22 and 24. `npm run check` and `npm pack` stay Docker-independent.
 
 ## Express demo
 
