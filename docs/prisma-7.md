@@ -1,6 +1,6 @@
 # Prisma 7 entrypoint
 
-Install this package alongside Prisma 7's `@prisma/client` and keep your application's Prisma CLI on version 7. Prisma 7 generates its client at an application-specific output path. Import `Prisma` from that generated client and bind the mapper to its error constructors:
+Install this package alongside `@prisma/client@~7.10.0` and keep your application's Prisma CLI on version 7.10.x. Prisma 7 generates its client at an application-specific output path. Import `Prisma` from that generated client and bind the mapper to its error constructors:
 
 ```ts
 import { Prisma } from './generated/prisma/client.js'; // use your generated output path
