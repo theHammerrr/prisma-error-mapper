@@ -17,17 +17,17 @@ Compatible with `@prisma/client` 6.14.x through the root entrypoint and 7.10.x t
 * constrain Prisma peer range to verified minors ([9bd1afc](https://github.com/theHammerrr/prisma-error-mapper/commit/9bd1afc932822766e4e8f6bfe88db92f906abf51))
 * normalize Prisma 7 adapter constraint metadata ([e78a1c3](https://github.com/theHammerrr/prisma-error-mapper/commit/e78a1c350a51646f5caf35ccc438feaa51fdd0bc))
 
-## 0.2.0 (unpublished source version, 2026-09-27)
+## 0.2.0 (source version 2026-09-27)
 
 - Added provider-aware PostgreSQL CHECK constraint parsing and named constraint handlers.
 - Added an unmatched Prisma error policy separate from the unrelated-error fallback.
 - Added the Express demo and PostgreSQL integration coverage.
 
-This version predates the release workflow and was not published to npm. Its `v0.2.0` tag records the final source snapshot for this version.
+This version predates the release workflow. It was published to npm on 2026-10-01 from the `v0.2.0` source tag.
 
-## 0.1.0 (unpublished source version, 2026-09-27)
+## 0.1.0 (source version 2026-09-27)
 
 - Introduced typed Prisma 6.14 error guards, metadata normalization, and application mappings.
 - Added initial PostgreSQL integration coverage.
 
-This version was not published to npm. Its `v0.1.0` tag records the final source snapshot before the 0.2.0 version bump.
+This version was published to npm on 2026-10-01 from the `v0.1.0` source tag, which records the final snapshot before the 0.2.0 version bump.

@@ -6,7 +6,8 @@ description: Integrate prisma-error-mapper into a consuming TypeScript applicati
 # Use prisma-error-mapper
 
 Read [the integration guide](references/integration-guide.md) before editing the
-consumer application. It documents the 0.2 API and its provider limitations.
+consumer application. It documents the Prisma 6 root API in package 0.3 and its
+provider limitations; Prisma 7 setup is in the package's `docs/prisma-7.md`.
 
 1. Inspect the application's installed package and Prisma versions, client generator,
    database provider, schema/migrations, error classes, and existing error boundary.
@@ -26,8 +27,9 @@ consumer application. It documents the 0.2 API and its provider limitations.
    missing metadata, and original-error preservation. Use an isolated database for
    provider-sensitive behavior. Run the application's typecheck and relevant tests.
 6. Report the integration points, verification performed, and any unverified
-   provider/version assumptions. Never claim Prisma 7 or PostgreSQL 15 support
-   based only on this package's PostgreSQL 16 tests.
+   provider/version assumptions. Use the separate Prisma 7 entrypoint and its
+   version-specific tests when claiming Prisma 7 support. Do not claim PostgreSQL
+   15 support based only on this package's PostgreSQL 16 tests.
 
 Use `throw handler(error)` only when the application intends to throw the mapped
 result. A handler may return an ordinary value. There is no `.throw()` or `.with()`
