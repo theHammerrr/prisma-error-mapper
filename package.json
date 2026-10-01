@@ -1,6 +1,6 @@
 {
   "name": "prisma-error-mapper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Typed Prisma 6 and 7 error guards and application mappings",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
