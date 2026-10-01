@@ -8,7 +8,6 @@ This project follows [Semantic Versioning](https://semver.org/). Each future rel
 ### Features
 
 * add Prisma 7 constructor-bound mapper ([cab480a](https://github.com/theHammerrr/prisma-error-mapper/commit/cab480a72b3cfbd27a1e09644c2de323d50a6bbf))
-* add Prisma 7 error mapper entrypoint ([74e0b11](https://github.com/theHammerrr/prisma-error-mapper/commit/74e0b11c2b887eafd935d7156c7006cca00da8c3))
 
 
 ### Bug Fixes
