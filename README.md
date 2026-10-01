@@ -12,6 +12,8 @@ npm install prisma-error-mapper @prisma/client@~6.14.0
 
 For local use, run `npm install`, `npm pack`, then install the generated tarball in your application. Keep your application's `prisma` CLI on the same 6.14.x version as its client.
 
+Release history is recorded in [CHANGELOG.md](CHANGELOG.md). Maintainers use the [release guide](docs/releasing.md) to prepare version bumps, Git tags, and GitHub releases.
+
 ## Coding-agent integration
 
 Use the [consumer integration guide](docs/integration-guide.md) when adding this
