@@ -8,7 +8,7 @@ Use conventional commit titles when merging changes into `main`: `fix:` for a pa
 
 After that pull request is merged, the same workflow creates the `v<package-version>` tag and GitHub release. The tag identifies the exact release commit. Do not create a tag for the unpublished 0.2.0 baseline.
 
-The workflow uses GitHub's default token. Repository settings must allow GitHub Actions to create pull requests. Events made with the default token do not trigger other workflows, so run the package checks on the release pull request before merging it. If the release pull request does not run CI automatically, start CI manually or configure a dedicated GitHub App token for the release workflow.
+The workflow uses GitHub's default token. Repository settings must allow GitHub Actions to create pull requests. Events made with the default token do not trigger other workflows. If CI does not start on the release pull request, run `gh workflow run ci.yml --ref <release-pr-branch>` and confirm its checks before merging, or configure a dedicated GitHub App token for the release workflow.
 
 ## npm publication
 
