@@ -368,14 +368,16 @@ This rejects inserts and updates when the email starts with `123`; values contai
 
 With the tested Prisma 6.14.0 standard client, ORM create/update failures are **`PrismaClientUnknownRequestError`**, with SQLSTATE `23514` and the constraint name embedded in the diagnostic message, but no structured `code` or `meta`. The package classifies them as `unknown-request`. Configured `constraints` mappings handle them directly; unmatched Prisma errors otherwise rethrow or reach `onUnhandledPrismaError`. Applications can also explicitly call `parsePrismaPostgresError` to derive a separate diagnostic structure. Executing a violating raw SQL statement instead yields P2010 with `meta.code === '23514'` and the name inside `meta.message`, still without a Prisma-provided constraint-name field. Integration tests cover parsing and direct mapping on both paths and verify that rejected updates leave the original email intact.
 
-Start Docker Desktop (Linux containers) or a local Docker Engine, then run:
+Start Docker Desktop (Linux containers) or a local Docker Engine, then run both version-specific suites:
 
 ```sh
 npm ci
 npm run test:integration
+npm run build
+npm run test:prisma7
 ```
 
-The npm command generates Prisma Client 6.14.0 and checks integration types before starting Vitest. In `tests/integration/postgres.test.ts`, `beforeAll` starts PostgreSQL using [`@testcontainers/postgresql`](https://node.testcontainers.org/modules/postgresql/), pushes the fixture schema through the Prisma CLI, connects Prisma Client, and installs the SQL constraints. Testcontainers uses a digest-pinned PostgreSQL 16.15 image, allocates an ephemeral host port, and waits for database health and port readiness. Test data lives in a temporary in-memory container filesystem, with a fresh random database password per run. Host port binding follows the container runtime's defaults.
+`test:integration` generates Prisma Client 6.14.0 and checks integration types before starting Vitest. `test:prisma7` installs the isolated Prisma 7.10.0 fixture dependencies, generates its client, and checks its types and PostgreSQL behavior. Both require Docker. In `tests/integration/postgres.test.ts`, `beforeAll` starts PostgreSQL using [`@testcontainers/postgresql`](https://node.testcontainers.org/modules/postgresql/), pushes the fixture schema through the Prisma CLI, connects Prisma Client, and installs the SQL constraints. Testcontainers uses a digest-pinned PostgreSQL 16.15 image, allocates an ephemeral host port, and waits for database health and port readiness. Test data lives in a temporary in-memory container filesystem, with a fresh random database password per run. Host port binding follows the container runtime's defaults.
 
 Each test clears its fixtures in `beforeEach`, and tests run sequentially within the spec. `afterAll` disconnects Prisma and removes the database container, including when setup or tests fail. Testcontainers' default Ryuk resource reaper provides additional cleanup after process exit; keep it enabled. A stopped Docker daemon can prevent cleanup until it is available again. The suite prints the database container ID for diagnostics, and downloaded images remain cached.
 
