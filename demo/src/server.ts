@@ -4,8 +4,10 @@ import type { ErrorRequestHandler, Request } from 'express';
 import {
   PrismaErrorCodes,
   createPrismaErrorHandler,
+  getPrismaErrorContext,
   getPrismaErrorKind,
   isPrismaError,
+  isPrismaKnownRequestError,
   parsePrismaPostgresError,
 } from 'prisma-error-mapper';
 import { AppError } from './app-error.js';
@@ -278,8 +280,15 @@ app.post('/examples/guard', async (request, response) => {
     const account = await prisma.account.create({ data: { email, name: 'guard example' } });
     response.status(201).json(account);
   } catch (error) {
-    if (isPrismaError(error, PrismaErrorCodes.UniqueConstraintViolation)) {
-      response.status(409).json({ code: error.code, target: error.meta?.target });
+    const context = getPrismaErrorContext(error);
+    if (isPrismaKnownRequestError(error)
+      && isPrismaError(error, PrismaErrorCodes.UniqueConstraintViolation)
+      && context?.code === PrismaErrorCodes.UniqueConstraintViolation) {
+      response.status(409).json({
+        code: error.code,
+        kind: context?.kind,
+        target: context?.meta.target,
+      });
       return;
     }
     throw error;

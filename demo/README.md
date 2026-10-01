@@ -45,7 +45,7 @@ docker compose down
 | `GET /examples/validation` | `onUnhandledPrismaError` for a validation error without a P-code |
 | `POST /examples/unhandled-prisma` | `onUnhandledPrismaError` for unsupported P2003 |
 | `GET /examples/fallback` | Non-Prisma `fallback` routing |
-| `POST /examples/guard` | `isPrismaError(error, 'P2002')` narrowing without a handler |
+| `POST /examples/guard` | `isPrismaKnownRequestError`, `isPrismaError`, and `getPrismaErrorContext` inspection without a handler |
 
 P2015 is part of the package's supported type map, but Prisma 6.14 with PostgreSQL
 normally emits P2025 for the nested-connect example. The route maps both codes so it

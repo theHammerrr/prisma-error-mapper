@@ -254,7 +254,7 @@ switch (getPrismaErrorKind(error)) {
 
 ## Structured PostgreSQL CHECK diagnostics (opt-in)
 
-`parsePrismaPostgresError(error)` derives a separate structure from narrow PostgreSQL CHECK failure formats. It supports the flattened `QueryError(PostgresError { ... })` ORM diagnostic verified against Prisma 6.14, a captured nested `QueryError(Error { kind: Db, cause: Some(DbError { ... }) })` diagnostic, and raw-query P2010 metadata with SQLSTATE 23514. It does not parse arbitrary Prisma messages or other constraint types.
+`parsePrismaPostgresError(error)` derives a separate structure from narrow PostgreSQL CHECK failure formats. It supports the flattened `QueryError(PostgresError { ... })` ORM diagnostic verified against Prisma 6.14, captured nested `QueryError(Error { kind: Db, cause: Some(DbError { ... }) })` diagnostics both with and without a trailing `transient: false` wrapper field, and raw-query P2010 metadata with SQLSTATE 23514. It does not parse arbitrary Prisma messages or other constraint types.
 
 ```ts
 import { parsePrismaPostgresError, createPrismaErrorHandler } from 'prisma-error-mapper';

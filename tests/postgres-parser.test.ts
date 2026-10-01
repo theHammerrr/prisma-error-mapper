@@ -13,8 +13,8 @@ ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Postgr
   assert.equal('meta' in error, false);
 });
 
-test('parses a captured nested CHECK diagnostic emitted by a Windows PostgreSQL server', () => {
-  const error = nestedConnector();
+test('parses a captured nested CHECK diagnostic with a Windows PostgreSQL source path', () => {
+  const error = nestedConnector(undefined, 'public', 'product', 'price_value_check', false);
   assert.deepEqual(parsePrismaPostgresError(error), {
     provider: 'postgresql', kind: 'check-constraint', sqlState: '23514', schemaName: 'public',
     tableName: 'product', constraintName: 'price_value_check', source: 'message', original: error,
@@ -54,10 +54,11 @@ function nestedConnector(
   message = 'new row for relation "product" violates check constraint "price_value_check"',
   schema: string | null = 'public', table: string | null = 'product',
   constraint: string | null = 'price_value_check',
+  includeTransient = true,
 ): Unknown {
   const optional = (value: string | null) => value === null ? 'None' : `Some(${JSON.stringify(value)})`;
   return new Unknown(String.raw`Error occurred during query execution:
-ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Error { kind: Db, cause: Some(DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState("23514"), message: ${JSON.stringify(message)}, detail: Some("Failing row contains (1, -1)."), hint: None, position: None, where_: None, schema: ${optional(schema)}, table: ${optional(table)}, column: None, datatype: None, constraint: ${optional(constraint)}, file: Some("d:\\pginstaller_12.auto\\postgres.windows-x64\\src\\backend\\executor\\execMain.c"), line: Some(2022), routine: Some("ExecConstraints") }) }) }), transient: false })`, { clientVersion: '6.14.0' });
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Error { kind: Db, cause: Some(DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState("23514"), message: ${JSON.stringify(message)}, detail: Some("Failing row contains (1, -1)."), hint: None, position: None, where_: None, schema: ${optional(schema)}, table: ${optional(table)}, column: None, datatype: None, constraint: ${optional(constraint)}, file: Some("d:\\pginstaller_12.auto\\postgres.windows-x64\\src\\backend\\executor\\execMain.c"), line: Some(2022), routine: Some("ExecConstraints") }) })${includeTransient ? ', transient: false' : ''} })`, { clientVersion: '6.14.0' });
 }
 
 test('parses raw-query metadata and retains the original metadata untouched', () => {
