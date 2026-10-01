@@ -1,6 +1,7 @@
 /**
  * Prisma 7 clients are generated at application-specific paths. Pass the Prisma
- * namespace exported by that client so class checks use its actual constructors.
+ * namespace exported by that client so class checks use its actual constructors
+ * without statically importing a Prisma 7 runtime path into the Prisma 6 build.
  */
 export type Prisma7KnownRequestError = Error & {
   code: string;

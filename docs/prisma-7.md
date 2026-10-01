@@ -2,6 +2,8 @@
 
 Install this package alongside `@prisma/client@~7.10.0` and keep your application's Prisma CLI on version 7.10.x. Prisma 7 generates its client at an application-specific output path. Import `Prisma` from that generated client and bind the mapper to its error constructors:
 
+You pass the generated client's `Prisma` namespace, not a `PrismaClient` instance or database connection. Prisma 7 applications can check errors directly with `error instanceof Prisma.PrismaClientKnownRequestError`. This library accepts the namespace so its Prisma 7 entrypoint has no static import from a runtime path unavailable in the root Prisma 6 development dependency. The generated client and Prisma 7 runtime use the same error constructors; this binding is a package design choice, not a Prisma 7 requirement.
+
 ```ts
 import { Prisma } from './generated/prisma/client.js'; // use your generated output path
 import { createPrisma7ErrorMapper } from 'prisma-error-mapper/prisma7';
@@ -24,3 +26,5 @@ try {
 The mapper checks actual Prisma error constructors, validates supported metadata, and preserves the original error when no mapping applies. `P2002`, `P2015`, `P2025`, and `P1012` are the supported typed codes. For a PostgreSQL unique violation, Prisma 7.10's adapter exposes the index name through `meta.driverAdapterError.cause.constraint.index`; the mapper normalizes that to `meta.constraintName`. The other Prisma error classes follow `onUnhandledPrismaError` or are rethrown. `fallback` handles unrelated values. PostgreSQL CHECK message parsing and named CHECK constraint handlers are specific to the Prisma 6.14 entrypoint; they are not exposed here.
 
 The `tests/prisma7` fixture uses Prisma 7.10.0 with a generated client and a PostgreSQL adapter. CI checks the package types and real P2002/P2025 errors against PostgreSQL. This version-scoped fixture has its own lockfile so the root fixture can continue testing Prisma 6.14.0.
+
+`clientVersion` is useful after an error is recognized, but reading it from an arbitrary caught value is insufficient to identify a Prisma error: another object can carry the same string, and it does not provide the constructor needed for an `instanceof` check. The mapper therefore binds constructors first, then interprets supported codes and metadata.

@@ -1,9 +1,14 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Prisma } from './generated/client.js';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { createPrisma7ErrorMapper } from '../../src/prisma7.js';
 
 const mapper = createPrisma7ErrorMapper(Prisma);
+
+test('generated client reuses the exported Prisma 7 runtime error constructor', () => {
+  assert.equal(PrismaClientKnownRequestError, Prisma.PrismaClientKnownRequestError);
+});
 
 test('maps a real Prisma 7 known error and preserves its original identity', () => {
   const error = new Prisma.PrismaClientKnownRequestError('duplicate', {
