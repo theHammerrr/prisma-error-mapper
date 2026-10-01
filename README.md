@@ -12,6 +12,8 @@ npm install prisma-error-mapper @prisma/client@~6.14.0
 
 For local use, run `npm install`, `npm pack`, then install the generated tarball in your application. Keep your application's `prisma` CLI on the same 6.14.x version as its client.
 
+Release history is recorded in [CHANGELOG.md](CHANGELOG.md). Maintainers use the [release guide](docs/releasing.md) to prepare version bumps, Git tags, and GitHub releases.
+
 The root import in the examples below is the Prisma 6.14 API. Prisma 7 applications use the separate [`prisma-error-mapper/prisma7` entrypoint](docs/prisma-7.md) and pass the `Prisma` namespace from their generated client. The two entrypoints share a package version but bind to their respective runtime constructors. The Prisma 7 entrypoint currently covers the typed error-code mappings; PostgreSQL CHECK diagnostic parsing remains scoped to Prisma 6.14.
 
 Prisma 8 is not supported yet. Its current release candidate uses database-specific runtime packages instead of `@prisma/client`, and [Prisma's release status](https://www.prisma.io/docs/orm/release-status) says the `P2002`-style codes this mapper handles are not available. A Prisma 8 adapter needs its final error API and a separate live integration fixture before it can be released.

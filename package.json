@@ -20,6 +20,7 @@
     "docs",
     "skills",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "sideEffects": false,
