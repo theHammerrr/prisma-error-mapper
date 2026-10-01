@@ -14,6 +14,8 @@ For local use, run `npm install`, `npm pack`, then install the generated tarball
 
 The root import in the examples below is the Prisma 6.14 API. Prisma 7 applications use the separate [`prisma-error-mapper/prisma7` entrypoint](docs/prisma-7.md) and pass the `Prisma` namespace from their generated client. The two entrypoints share a package version but bind to their respective runtime constructors. The Prisma 7 entrypoint currently covers the typed error-code mappings; PostgreSQL CHECK diagnostic parsing remains scoped to Prisma 6.14.
 
+Prisma 8 is not supported yet. Its current release candidate uses database-specific runtime packages instead of `@prisma/client`, and [Prisma's release status](https://www.prisma.io/docs/orm/release-status) says the `P2002`-style codes this mapper handles are not available. A Prisma 8 adapter needs its final error API and a separate live integration fixture before it can be released.
+
 ## Coding-agent integration
 
 Use the [consumer integration guide](docs/integration-guide.md) when adding this

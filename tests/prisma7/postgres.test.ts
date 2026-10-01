@@ -52,9 +52,9 @@ test('generated Prisma 7 constructors recognize and map real P2002/P2025 errors'
   const context = mapper.getPrismaErrorContext(duplicate);
   assert.equal(context?.code, 'P2002');
   assert.equal(context?.original, duplicate);
-  console.log('Prisma 7 P2002 metadata:', (duplicate as { meta?: unknown }).meta);
-  const handler = mapper.createPrismaErrorHandler({ P2002: () => 'duplicate' });
-  assert.equal(handler(duplicate), 'duplicate');
+  if (context?.code === 'P2002') assert.equal(context.meta.constraintName, 'Account_email_key');
+  const handler = mapper.createPrismaErrorHandler({ P2002: ({ meta }) => meta.constraintName });
+  assert.equal(handler(duplicate), 'Account_email_key');
 
   const missing = await rejected(client.account.update({ where: { id: -1 }, data: { email: 'missing@example.test' } }));
   assert.equal(mapper.isPrismaError(missing, 'P2025'), true);

@@ -52,6 +52,17 @@ function validMeta(meta: unknown, code: Prisma7ErrorCode): boolean {
     || (Array.isArray(meta.target) && Array.from(meta.target).every(item => typeof item === 'string'));
 }
 
+function uniqueConstraint(meta: Record<string, unknown> | undefined): { target?: string[]; constraintName?: string } {
+  const adapterError = meta?.driverAdapterError;
+  if (!isRecord(adapterError) || !isRecord(adapterError.cause)) return {};
+  const cause = adapterError.cause;
+  if (cause.kind !== 'UniqueConstraintViolation' || !isRecord(cause.constraint)) return {};
+  const { fields, index } = cause.constraint;
+  if (Array.isArray(fields) && fields.every(field => typeof field === 'string')) return { target: [...fields] };
+  if (typeof index === 'string') return { constraintName: index };
+  return {};
+}
+
 /** Create guards and mappings bound to a generated Prisma 7 client's classes. */
 export function createPrisma7ErrorMapper(prisma: Prisma7Constructors) {
   function isPrismaKnownRequestError(error: unknown): error is Prisma7KnownRequestError {
@@ -89,6 +100,7 @@ export function createPrisma7ErrorMapper(prisma: Prisma7Constructors) {
       const { code, meta } = error;
       if (code === 'P2002' && validMeta(meta, code)) return {
         code, kind: 'known-request', original: error, meta: {
+          ...uniqueConstraint(meta),
           ...(Array.isArray(meta?.target) ? { target: [...meta.target] as string[] } : {}),
           ...(typeof meta?.target === 'string' ? { constraintName: meta.target } : {}),
           ...(meta?.modelName !== undefined ? { modelName: meta.modelName as string } : {}),

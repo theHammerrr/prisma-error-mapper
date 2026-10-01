@@ -31,3 +31,15 @@ test('does not claim unrelated lookalikes or swallow other Prisma errors', () =>
   });
   assert.throws(() => handle(missing), value => value === missing);
 });
+
+test('normalizes Prisma 7 adapter unique-constraint metadata', () => {
+  const error = new Prisma.PrismaClientKnownRequestError('duplicate', {
+    code: 'P2002', clientVersion: '7.10.0',
+    meta: { driverAdapterError: { cause: {
+      kind: 'UniqueConstraintViolation', constraint: { index: 'Account_email_key' },
+    } } },
+  });
+  const context = mapper.getPrismaErrorContext(error);
+  assert.equal(context?.code, 'P2002');
+  if (context?.code === 'P2002') assert.equal(context.meta.constraintName, 'Account_email_key');
+});

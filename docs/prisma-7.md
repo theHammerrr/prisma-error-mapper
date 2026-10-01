@@ -21,6 +21,6 @@ try {
 }
 ```
 
-The mapper checks actual Prisma error constructors, validates supported metadata, and preserves the original error when no mapping applies. `P2002`, `P2015`, `P2025`, and `P1012` are the supported typed codes. The other Prisma error classes follow `onUnhandledPrismaError` or are rethrown. `fallback` handles unrelated values. PostgreSQL CHECK message parsing and named CHECK constraint handlers are specific to the Prisma 6.14 entrypoint; they are not exposed here.
+The mapper checks actual Prisma error constructors, validates supported metadata, and preserves the original error when no mapping applies. `P2002`, `P2015`, `P2025`, and `P1012` are the supported typed codes. For a PostgreSQL unique violation, Prisma 7.10's adapter exposes the index name through `meta.driverAdapterError.cause.constraint.index`; the mapper normalizes that to `meta.constraintName`. The other Prisma error classes follow `onUnhandledPrismaError` or are rethrown. `fallback` handles unrelated values. PostgreSQL CHECK message parsing and named CHECK constraint handlers are specific to the Prisma 6.14 entrypoint; they are not exposed here.
 
 The `tests/prisma7` fixture uses Prisma 7.10.0 with a generated client and a PostgreSQL adapter. CI checks the package types and real P2002/P2025 errors against PostgreSQL. This version-scoped fixture has its own lockfile so the root fixture can continue testing Prisma 6.14.0.
