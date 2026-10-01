@@ -1,13 +1,17 @@
 {
   "name": "prisma-error-mapper",
   "version": "0.2.0",
-  "description": "Typed Prisma 6.14 error guards and provider-aware application mappings",
+  "description": "Typed Prisma 6 and 7 error guards and application mappings",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./prisma7": {
+      "types": "./dist/prisma7.d.ts",
+      "import": "./dist/prisma7.js"
     }
   },
   "files": [
@@ -24,10 +28,11 @@
     "node": ">=22"
   },
   "peerDependencies": {
-    "@prisma/client": "~6.14.0"
+    "@prisma/client": "~6.14.0 || ~7.10.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test:prisma7": "npm --prefix tests/prisma7 ci && npm --prefix tests/prisma7 run verify",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:integration": "prisma generate --schema tests/integration/schema.prisma && tsc -p tsconfig.integration.json --noEmit && vitest run --config vitest.integration.config.ts",

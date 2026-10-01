@@ -1,5 +1,6 @@
 node_modules/
 dist/
+tests/prisma7/generated/
 .test-build/
 .integration-build/
 *.tgz
